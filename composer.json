@@ -1,0 +1,12 @@
+{
+   "name": "steady-as-hill/single-service-server",
+   "description": "single service framework, base on swoole",
+    "keywords": ["service"],
+    "license": "MIT",
+    "require": {
+
+    },
+    "autoload": {
+      "psr-4": { "SingleService\\": "src/SingleService" }
+    }
+}
