@@ -74,10 +74,10 @@ class Loger
     /**
      * 开始处理一个新的请求的时候，调用此函数完成一些初始化（创建当前请求的唯一标识）
      */
-    public function initOnNewRequest($uri)
+    public function initOnNewRequest($uri,$remote_addr)
     {
         $dt = time();
-        $this->env=array('sooh2_the_req_uri'=>$uri,'sooh2_the_proc_sn'=>md5($dt.rand(1000000,9999999)));
+        $this->env=array('ip'=>$remote_addr,'sooh2_the_req_uri'=>$uri,'sooh2_the_proc_sn'=>md5($dt.rand(1000000,9999999)));
         $this->initOnNewRequest_fileTpl($dt);
         return $this;
     }
@@ -121,7 +121,7 @@ class Loger
      */
     public function initFileTpl($basedir=null,$filenameWithSubDir=null)
     {
-        $this->fileTpl = array('dir'=>$basedir,'file'=>$filenameWithSubDir);
+        $this->fileTpl = array('dir'=>rtrim($basedir,'/'),'file'=>$filenameWithSubDir);
         return $this;
     }
     /**
@@ -136,34 +136,32 @@ class Loger
         $s = date('Y m d H i s',$timeStamp);
         $tmp = explode(' ',$s);
 
-        if($this->fileThisRequest){
-            $this->fileThisRequest=array();
-            $tmp[6]='common';
-            $this->fileThisRequest['common'] = str_replace(
-                   array('{year}','{month}','{day}','{hour}','{minute}','{second}','{type}'), 
-                   $tmp, 
-                   $this->dir.'/'.$this->filename);
-            $tmp[6]='error';
-            $this->fileThisRequest['error'] = str_replace(
-                   array('{year}','{month}','{day}','{hour}','{minute}','{second}','{type}'), 
-                   $tmp, 
-                   $this->dir.'/'.$this->filename);
-            $tmp[6]='trace';
-            $this->fileThisRequest['debug'] = str_replace(
-                   array('{year}','{month}','{day}','{hour}','{minute}','{second}','{type}'), 
-                   $tmp, 
-                   $this->dir.'/'.$this->filename);
-        }
+
+        $this->fileThisRequest=array();
+        $tmp[6]='common';
+        $this->fileThisRequest['common'] = str_replace(
+               array('{year}','{month}','{day}','{hour}','{minute}','{second}','{type}'), 
+               $tmp, 
+               $this->fileTpl['dir'].'/'.$this->fileTpl['file']);
+        $tmp[6]='error';
+        $this->fileThisRequest['error'] = str_replace(
+               array('{year}','{month}','{day}','{hour}','{minute}','{second}','{type}'), 
+               $tmp, 
+               $this->fileTpl['dir'].'/'.$this->fileTpl['file']);
+        $tmp[6]='trace';
+        $this->fileThisRequest['trace'] = str_replace(
+               array('{year}','{month}','{day}','{hour}','{minute}','{second}','{type}'), 
+               $tmp, 
+               $this->fileTpl['dir'].'/'.$this->fileTpl['file']);
     }
 
 
     protected function _writeTxtFile($func, $str)
     {
-        if(empty($this->fileTpl)){
+        if(empty($this->fileThisRequest)){
             error_log(' ## '.$str);
         }else{
             list($tracelevel, $type)=explode('_',$func);
-            
             file_put_contents($this->fileThisRequest[$type], date('M-d H:i:s').' ## '.$str."\n",FILE_APPEND);
         }
     }
@@ -220,14 +218,18 @@ class Loger
         $traceStr='';
         $traceObj='';
         if(is_null($msgOrObj)){
-            $traceStr.='null';
+            if(is_null($prefixIntro)){
+                $traceStr.='null';
+            }
         }if(is_scalar($msgOrObj)){
             $traceStr.=$msgOrObj;
         }else{
             $traceObj = var_export($msgOrObj,true);
         }
         if(is_null($prefixIntro)){
-            $traceStr.='null';
+            if(is_null($msgOrObj)){
+                $traceStr.='null';
+            }
         }if(is_scalar($prefixIntro)){
             $traceStr.=$prefixIntro;
         }else{
@@ -277,7 +279,7 @@ class Loger
      */    
     public function sys_warning($msgOrObj,$moreIntro=null)
     {
-        $this->sys_error(__FUNCTION__,$msgOrObj, $moreIntro);
+        $this->sys_error($msgOrObj, $moreIntro);
     }
     public function sys_error($msgOrObj,$moreIntro=null)
     {
@@ -300,7 +302,7 @@ class Loger
      */
     public function app_warning($msgOrObj,$moreIntro=null)
     {
-        $this->app_error(__FUNCTION__,$msgOrObj, $moreIntro);
+        $this->app_error($msgOrObj, $moreIntro);
     }
     public function app_error($msgOrObj,$moreIntro=null)
     {
@@ -318,7 +320,7 @@ class Loger
      */
     public function lib_warning($msgOrObj,$moreIntro=null)
     {
-        $this->lib_error(__FUNCTION__,$msgOrObj, $moreIntro);
+        $this->lib_error($msgOrObj, $moreIntro);
     }
     public function lib_error($msgOrObj,$moreIntro=null)
     {

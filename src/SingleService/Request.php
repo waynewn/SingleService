@@ -32,4 +32,48 @@ class Request {
             return $this->_params[$key];
         }
     }
+    public function setMCA($m,$c,$a)
+    {
+        $this->_params['__AcT__']=$a;
+        $this->_params['__CtrL__']=$c;
+        $this->_params['__MdL__']=$m;
+    }
+    public function getActionName()
+    {
+        return $this->_params['__AcT__'];
+    }
+    public function getControllerName()
+    {
+        return $this->_params['__CtrL__'];
+    }
+    public function getModuleName()
+    {
+        return $this->_params['__MdL__'];
+    }
+    public function getCookie($key)
+    {
+        if(isset($this->_req->cookie[$key])){
+            return $this->_req->cookie[$key];
+        }else{
+            return null;
+        }
+    }
+    public function getServerHeader($key)
+    {
+        if(isset($this->_req->server[$key])){
+            return $this->_req->server[$key];
+        }elseif(isset($this->_req->header[$key])){
+            return $this->_req->header[$key];
+        }else{
+            return null;
+        }
+    }
+    /**
+     * 获取 $_FILES
+     * @return array
+     */
+    public function getUploadFile()
+    {
+        return $this->_req->files;
+    }
 }

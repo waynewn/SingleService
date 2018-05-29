@@ -25,23 +25,33 @@ class Plugin {
      */
     protected $_view;
 
-    
+    protected $successCode;
     /**
      *
      * @var \SingleService\Config 
      */
     protected $_Config;    
-    public static function factory($request,$view,$config,$log)
+    public static function factory($request,$view,$config,$log,$successCode)
     {
         $c = get_called_class();
         $obj = new $c;
         $obj->_request = $request;
+        $obj->successCode=$successCode;
         $obj->_view=$view;
         $obj->_Config=$config;
         $obj->_log = $log;
         return $obj;
     }
     
+    protected function setReturnMsgAndCode($msg,$errCode=null)
+    {
+        $this->_view->assign($this->successCode[2],$msg);
+        if($errCode!==null){
+            $this->_view->assign($this->successCode[0],$errCode);
+        }else{
+            $this->_view->assign($this->successCode[0],$this->successCode[1]);
+        }
+    }    
     /**
      * 在执行action之前调用，返回是否继续执行action
      * @return boolean 是否继续执行action

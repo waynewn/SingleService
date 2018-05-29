@@ -25,13 +25,7 @@ class ServiceController
     
     protected function setReturnMsgAndCode($msg,$errCode=null)
     {
-        $tmp = $this->_Config->dump();
-        $newone = $this->_Config->getIni($msg);
-        if($newone){
-            $this->_view->assign($this->successCode[2],$newone);
-        }else{
-            $this->_view->assign($this->successCode[2],$msg);
-        }
+        $this->_view->assign($this->successCode[2],$msg);
         if($errCode!==null){
             $this->_view->assign($this->successCode[0],$errCode);
         }else{
@@ -82,13 +76,19 @@ class ServiceController
      * 在执行action之前调用，返回是否继续执行action
      * @return boolean 是否继续执行action
      */
-    protected function checkBeforeAction()
+    public function checkBeforeAction()
     {
-        if(class_exists('\\Plugins\\Plugin',false)){
-            $this->_plugin = call_user_func('\\Plugins\\Plugin::factory',$this->_request,$this->_view,$this->_Config,$this->_log);
+        $this->getPlugin();
+        if($this->_plugin){
             return $this->_plugin->checkBeforeAction();
         }else{
             return true;
+        }
+    }
+    protected function getPlugin()
+    {
+        if(class_exists('\\Plugins\\Plugin',false)){
+            $this->_plugin = call_user_func('\\Plugins\\Plugin::factory',$this->_request,$this->_view,$this->_Config,$this->_log,$this->successCode);
         }
     }
     /**
@@ -100,10 +100,10 @@ class ServiceController
      * 在执行action之后调用，做些额外工作，无返回值
      * @param bool $actionExecuted action 执行过还是没执行过
      */
-    protected function doAfterAction($actionExecuted)
+    public function doAfterAction($actionExecuted)
     {
         if($this->_plugin){
-            $this->_plugin->doAfterAction($actionExecuted);
+            return $this->_plugin->doAfterAction($actionExecuted);
         }
     }
 
@@ -113,7 +113,7 @@ class ServiceController
      */
     protected function setHttpCode($code)
     {
-        $this->_serverOfThisSingleService->httpCodeAndNewLocation($code);
+        $this->_view->httpCodeAndNewLocation($code);
     }
     /**
      * 设置重定向
@@ -121,7 +121,7 @@ class ServiceController
      */
     protected function redirect($newLocation)
     {
-        $this->_serverOfThisSingleService->httpCodeAndNewLocation(301,$newLocation);
+        $this->_view->httpCodeAndNewLocation(301,$newLocation);
     }
 }
 

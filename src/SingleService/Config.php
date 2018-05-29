@@ -18,44 +18,80 @@ class Config
         }
         $name= ucfirst($name0);
         $obj = new Config();
+        $obj->_ini_original=array('dirOrUrl'=>$dirOrUrl,'name'=>$name);
+        $obj->reload();
+        return $obj;
+
+    }
+    protected $_ini_original;
+    public function reload()
+    {
+        $dirOrUrl = $this->_ini_original['dirOrUrl'];
+        $name = $this->_ini_original['name'];
         if(strtolower(substr($dirOrUrl, 0,4))=='http'){
             $tmp = self::getConfigFromUrl($dirOrUrl,$name);
-            $obj->loaded[$name]=$tmp[$name];
-            if(!empty($obj->loaded[$name]['NeedsMoreIni'])){
-                $tmp = self::getConfigFromUrl($dirOrUrl,$obj->loaded[$name]['NeedsMoreIni']);
+            $this->loaded[$name]=$tmp[$name];
+            if(!empty($this->loaded[$name]['NeedsMoreIni'])){
+                $tmp = self::getConfigFromUrl($dirOrUrl,$this->loaded[$name]['NeedsMoreIni']);
                 foreach ($tmp as $k=>$v) {
-                    $obj->loaded[$k]=$v;
+                    $this->loaded[$k]=$v;
                 }
             }
         }else{
-            $obj->loaded[$name]= $obj->loadIniFile($dirOrUrl, $name);
-            if(!empty($obj->loaded[$name]['NeedsMoreIni'])){
-                if($obj->loaded[$name]['NeedsMoreIni']=='*'){//加载全部配置
-                    $obj->loadAllIni($dirOrUrl,$obj);
+            $this->loaded[$name]= $this->loadIniFile($dirOrUrl, $name);
+            if(!empty($this->loaded[$name]['NeedsMoreIni'])){
+                if($this->loaded[$name]['NeedsMoreIni']=='*'){//加载全部配置
+                    $this->loadAllIni($dirOrUrl);
                 }else{//加载指定额外配置
-                    $ks = explode(',', $obj->loaded[$name]['NeedsMoreIni']);
+                    $ks = explode(',', $this->loaded[$name]['NeedsMoreIni']);
                     foreach($ks as $k){
-                        $obj->loaded[$k] = $obj->loadIniFile($dirOrUrl, $k);
+                        if(is_dir($dirOrUrl.'/'.$k)){
+                            $sub = scandir($dirOrUrl.'/'.$k);
+                            foreach($sub as $k2){
+                                $t = substr($k2, -4);
+                                $name2 = substr($k2, 0,strpos($k2, '.'));
+                                if($t=='.php'){
+                                    $this->loaded[$k][$name2] = include $dirOrUrl.'/'.$k.'/'.$k2;
+                                }elseif($t=='.ini'){
+                                    $this->loaded[$k][$name2] = parse_ini_string(file_get_contents($dirOrUrl.'/'.$k.'/'.$k2),true);
+                                }
+                            }
+                        }else{
+                            $this->loaded[$k] = $this->loadIniFile($dirOrUrl, $k);
+                        }
                     }
                 }
             }
         }
-        if(!isset($obj->loaded[$name])){
+        if(!isset($this->loaded[$name])){
             throw new \ErrorException('missing config for '.$name .' from '.$dirOrUrl);
         }
-        return $obj;
-
     }
-    protected function loadAllIni($dirOrUrl,$obj)
+    
+    protected function loadAllIni($dirOrUrl)
     {
         $tmp  = scandir($dirOrUrl);
         foreach($tmp as $k){
+            if($k[0]=='.'){
+                continue;
+            }
             $t = substr($k, -4);
             $name = substr($k, 0,strpos($k, '.'));
             if($t=='.php'){
-                $obj->loaded[$name] = include $dirOrUrl.'/'.$k;
+                $this->loaded[$name] = include $dirOrUrl.'/'.$k;
             }elseif($t=='.ini'){
-                $obj->loaded[$name] = parse_ini_string(file_get_contents($dirOrUrl.'/'.$k),true);
+                $this->loaded[$name] = parse_ini_string(file_get_contents($dirOrUrl.'/'.$k),true);
+            }elseif(is_dir($dirOrUrl.'/'.$k)){
+                $sub = scandir($dirOrUrl.'/'.$k);
+                foreach($sub as $k2){
+                    $t = substr($k2, -4);
+                    $name2 = substr($k2, 0,strpos($k2, '.'));
+                    if($t=='.php'){
+                        $this->loaded[$k][$name2] = include $dirOrUrl.'/'.$k.'/'.$k2;
+                    }elseif($t=='.ini'){
+                        $this->loaded[$k][$name2] = parse_ini_string(file_get_contents($dirOrUrl.'/'.$k.'/'.$k2),true);
+                    }
+                }
             }
         }
     }
@@ -155,9 +191,10 @@ class Config
         return $tmp;
     }
     /**
-     * 设置Ini, 注意以下两点：
+     * 设置Ini, 注意以下三点：
      * 1）如果存在相应的配置文件，请确认文件已被加载过再调用此函数
      * 2）key最大深度4层
+     * 3）SingleService是工作在swoole环境下，这个设置除了当前任务进程，其他进程，可能有影响，可能没影响，尽量用getRuntime & setRuntime
      */
     public function setIni($k,$v)
     {

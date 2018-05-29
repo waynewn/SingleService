@@ -7,10 +7,10 @@ include_once 'View.php';
 include_once 'Plugin.php';
 include_once 'Loger.php';
 include_once 'ServiceController.php';
+include_once 'AsyncTaskDispather.php';
 if(!class_exists('\swoole_http_server',false)){
     dl("swoole.so");
 }
-define("KEEPWORD_TASKFUNC_NAME",'kw_task_func_name_trans');
 class Server
 {
     protected $ServiceModuleName;//modulename（used in file system）
@@ -46,14 +46,23 @@ class Server
         $this->successCode[3]=$msg;
         return $this;
     }
+    protected $wwwroot=null;
+    public function initWWW($dir)
+    {
+        $this->wwwroot = $dir;
+        return $this;
+    }
     public function initConfigPath($dirOrUrl)
     {
         if(empty($this->ServiceModuleName)){
             die('call initServiceModule() first');
         }
-        $this->config = \SingleService\Config::getInstance($dirOrUrl,$this->ServiceModuleName);
-        $this->serviceNameInUri = $this->config->getIni($this->ServiceModuleName.'.SERVICE_MODULE_NAME');
-        
+        try{
+            $this->config = \SingleService\Config::getInstance($dirOrUrl,$this->ServiceModuleName);
+            $this->serviceNameInUri = explode(',',$this->config->getIni($this->ServiceModuleName.'.SERVICE_MODULE_NAME'));
+        }catch(\ErrorException $ex){
+            die($ex->getMessage());
+        }
         return $this;
     }
 
@@ -64,13 +73,31 @@ class Server
         return $this;
     }
     protected $_includePath=null;
+    /**
+     * 设置自定义的view类
+     * @param type $view
+     */
+    public function initView($view)
+    {
+        $this->_view=$view;
+        return $this;
+    }
+    protected $_view=null;
     public function initIncludePath($path)
     {
         $this->_includePath = $path;
         spl_autoload_register(array($this,'autoload_locallibs'));
         return $this;
     }
-    
+    public function initSetCtrlIfMissing($ctrlname)
+    {
+        if(!is_string($ctrlname)){
+            die('arg: ctrl_with_missctrlAction should be string');
+        }
+        $this->whenCtrlMiss = ucfirst($ctrlname);
+        return $this;
+    }
+    protected $whenCtrlMiss=null;
     public function getConfig()
     {
         return $this->config;
@@ -100,29 +127,156 @@ class Server
     {
         $this->taskRunning = new \Swoole\Atomic\Long();
         $this->preloadModuleLibrary($this->baseDir.'/library');
+        if($this->_view===null){
+            $this->_view=new \SingleService\View;
+        }
         $this->startSwoole($ip, $port, 
-                $this->config->getIni($this->ServiceModuleName.'.MAILSERVICE_MAX_REQUEST'), 
-                $this->config->getIni($this->ServiceModuleName.'.MAILSERVICE_MAX_TASK'));
+                $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_REQUEST'), 
+                $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
+        $this->log->initOnNewRequest('[start]', '127.0.0.1');
+        $this->log->app_trace($this->ServiceModuleName." start listening on $port");
+        echo $this->ServiceModuleName." start listening on $port";
+        $this->swoole->start();        
     }
-    
+    public function runTaskOnly($taskFuncname,$paramJsonstring)
+    {
+        $this->preloadModuleLibrary($this->baseDir.'/library');
+        if($this->_view===null){
+            $this->_view=new \SingleService\View;
+        }
+        $this->startSwoole('127.0.0.1', 0, 
+                $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_REQUEST'), 
+                $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
+        $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
+        if(substr($paramJsonstring,0,1)=='{'||substr($paramJsonstring,0,1)=='['){
+            $data = json_decode($paramJsonstring,true);
+            if(!is_array($data)){
+                die('json error:'.$paramJsonstring."\n");
+            }
+        }
+        
+        $this->log->initOnNewRequest('///'.$taskFuncname,'0.0.0.0');
+        try{
+            $tmp->doBeforeTask($taskFuncname,$data);
+            $ret = $tmp->$taskFuncname($data);
+            $tmp->doAfterTask($taskFuncname,$data);
+            if(empty($ret)){
+                $this->taskRunning_dec();
+            }else{
+                return $ret;
+            }
+        }catch(\ErrorException $ex){
+            $ret = $tmp->onError($ex, $taskFuncname, $data);
+            if(empty($ret)){
+                $this->taskRunning_dec();
+            }else{
+                return $ret;
+            }
+        }
+    }
+    //------------------------加载项目专属的所有类库 --------------------开始
+    protected $_flgAutoLoadLocalLibrary = false;
+    public function initAutloadLocalLibrary($flg=true)
+    {
+        $this->_flgAutoLoadLocalLibrary=$flg;
+        return $this;
+    }
     protected function preloadModuleLibrary($dir)
     {
-        if(!is_dir($dir)){
+        if(!$this->_flgAutoLoadLocalLibrary){
             return;
         }
+        $parsed = $this->parseAllPHP($this->getAllFiles($dir));
+        $loaded=array();
+        for($i=0;$i<100000;$i++){
+            foreach($parsed as $classname=>$r){
+                $extendsFrom = $r['extends'];
+                $filepath = $r['path'];
+                if(empty($extendsFrom) || isset($loaded[$extendsFrom]) || !isset($parsed[$extendsFrom])){
+                    include $filepath;
+                    $loaded[$classname]=true;
+                    unset($parsed[$classname]);
+                }
+            }
+            if(sizeof($parsed)==0){
+                break;
+            }
+        }
+    }
+    protected function parseAllPHP($allFiles)
+    {
+        $ret = array();
+        foreach($allFiles as $f){
+            $s = file_get_contents($f);
+            
+            $pos1 = strpos($s, 'namespace');
+            $pos2 = strpos($s, ';', $pos1+9);
+            $namespace = trim(trim(trim(substr($s, $pos1+9,$pos2-$pos1-8)),';'));
+            
+            $pos3 = strpos($s, 'class');
+            if($pos3===false){
+                continue;
+            }
+            $pos4 = strpos($s, '{', $pos3+5);
+            $tmp = str_replace(array("\r","\n","\t"), ' ', substr($s, $pos3,$pos4-$pos3));
+            
+            $arr = explode(' ', $tmp);
+            $parts = array();
+            $key = '';
+            foreach($arr as $c){
+                if($c!=''){
+                    if($key==''){
+                        $key=$c;
+                    }else{
+                        $parts[strtolower($key)]=$c;
+                        $key='';
+                    }
+                }
+            }
+            $classWithNamespace = str_replace('\\\\','\\','\\'.$namespace.'\\'.$parts['class']);
+            $extendsWithNamespace = '';
+            if(empty($parts['extends'])){//没有 extends
+                $extendsWithNamespace='';
+            }elseif(substr($parts['extends'],0,1)=='\\'){//extends 完整路径
+                $extendsWithNamespace=$parts['extends'];
+            }else{
+                $extendsWithNamespace = '\\'.$namespace.'\\'.$parts['extends'];
+                $found = preg_match_all("/use (.*);/", substr($s,0,$pos3),$uses);
+                if($found>0){//有use 的情况
+                    foreach ($uses[1] as $s3){
+                        $r3 = explode('\\', $s3);
+                        if(array_pop($r3)==$parts['extends']){
+                            $extendsWithNamespace='\\'.$s3;
+                            break;
+                        }
+                    }
+                }
+            }
+            $ret[strtolower($classWithNamespace)]= array('extends'=> strtolower(str_replace('\\\\','\\',$extendsWithNamespace)),'path'=>$f);
+        }
+        return $ret;
+    }
+    
+    protected function getAllFiles($dir)
+    {
+        if(!is_dir($dir)){
+            return array();
+        }
+        $files = array();        
         $tmp  = scandir($dir);
         foreach($tmp as $s){
             if(ord($s)==46){// . or ..
                 continue;
             }
             if(is_dir($dir.'/'.$s)){
-                $this->preloadModuleLibrary($dir.'/'.$s);
+                $files = array_merge($files,$this->getAllFiles($dir.'/'.$s));
             }elseif(substr($s,-4)=='.php'){
-                include $dir.'/'.$s;
+                $files[]= $dir.'/'.$s;
             }
         }
+        return $files;
     }
-
+    //------------------------加载项目专属的所有类库 ----------------------结束
 
     /**
      * 当前正在运行的任务书数
@@ -137,33 +291,149 @@ class Server
     {
         $this->taskRunning->sub(1);
     }
-    public function httpCodeAndNewLocation($code,$redir=null)
+    public function taskRunning_get()
     {
-        $this->forceCodeAndLocation=array($code,$redir);
+        return $this->taskRunning->get();
     }
-    protected $forceCodeAndLocation;
+
     protected $swoole;
     /**
      *
      * @var \SingleService\Loger 
      */
     protected $log;
+    protected function doInternalCmd($cmd,$request, $response)
+    {
+        switch ($cmd){
+            case 'onServerStart':
+                $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
+                $tmp->onServerStart($this);
+
+                $response->header("Content-Type", "application/json");
+                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' first called"}');
+                return;
+            case 'shutdownThisNode':
+                $response->header("Content-Type", "application/json");
+                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' shutting down"}');
+                $this->swoole->shutdown();
+                return;
+            case 'getNumProcessRunning':
+                $response->header("Content-Type", "application/json");
+                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' numProcessRunning='.$this->taskRunning->get().'"}');
+                return;
+            case 'reloadConfig':
+                $response->header("Content-Type", "application/json");
+                $this->config->reload();
+                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' config reloaded"}');
+                return;
+            case 'dumpConfig':
+                $response->header("Content-Type", "application/json");
+                $response->end(json_encode(array(
+                            $this->successCode[0]=>$this->successCode[1],
+                            'all_ini'=>$this->config->dump()
+                        )));
+                return;
+            default:
+                $response->header("Content-Type", "application/json");
+                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"unknown cmd: '.$cmd.' for '.$this->ServiceModuleName.'"}');
+                return;
+        }
+    }
+    
+    protected function dealwith_www($uri,$response)
+    {
+        $tmp1 = explode('#',$uri);
+        $tmp2 = explode('?',$tmp1[0]);
+        $file = '';
+        if(substr($tmp2[0],-1)=='/'){
+            $contentType="text/html";
+            $file = $this->wwwroot.'/index.html';
+        }elseif(is_dir($this->wwwroot.$tmp2[0])){
+            $contentType="text/html";
+            $file = $this->wwwroot.$tmp2[0].'/index.html';
+        }else{
+            $chk = strtolower(substr($tmp2[0],strrpos($tmp2[0],'.')+1));
+            //$fullpath = $this->wwwroot.$tmp2[0];
+            if($chk=='html' || $chk=='htm'){
+                $contentType = "text/html";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='js'){
+                $contentType = "application/x-javascript";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='css'){
+                $contentType = "text/css";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='jpg'){
+                $contentType = "image/jpeg";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='png'){
+                $contentType = "image/png";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='gif'){
+                $contentType = "image/gif";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='jpeg'){
+                $contentType = "image/jpeg";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='map'){
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='txt'){
+                $contentType = "text/plain";
+                $file = $this->wwwroot.$tmp2[0];
+            }elseif($chk=='pdf'){
+                $contentType = "application/pdf";
+                $file = $this->wwwroot.$tmp2[0];
+            }else{
+                return '';
+            }
+        }
+        $response->header("Content-Type", $contentType);
+        return $file;
+    }
     public function dispatch($request, $response)
     {
-        $this->log->initOnNewRequest($request->server['request_uri']);
+        if(!empty($request->header['x-forwarded-for'])){
+            $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'].','.trim($request->header['x-forwarded-for'],'[]'));
+        }else{
+            $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr']);
+        }
+        $this->log->app_trace('['.$request->server['remote_addr'].']'.$request->server['request_uri']);
+        if($this->wwwroot!==null){
+            $file = $this->dealwith_www($request->server['request_uri'], $response);
+            if(!empty($file)){
+                if(is_file($file)){
+                    $this->log->app_common("GET $file 200");
+                    $response->end(file_get_contents($file));
+                }else{
+                    $this->log->app_common("GET $file 404");
+                    $response->status(404);
+                    $response->end();
+                }
+                return;
+            }
+        }
+        
         $mca = explode('/', $request->server['request_uri']);//  /开头，mca[0]是空串
-        if($mca[1]=='shutdownThisNode' || $mca[2]=='shutdownThisNode'){
-            $response->header("Content-Type", "application/json");
-            $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' shutting down"}');
-            $this->swoole->shutdown();
-            return;
-        }elseif($mca[1]=='getNumProcessRunning' || $mca[2]=='getNumProcessRunning'){
-            $response->header("Content-Type", "application/json");
-            $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' numProcessRunning='.$this->taskRunning->get().'"}');
-            return;
+        if($mca[1]=='SteadyAsHill'){//这些系统命令只接受本地请求
+            if($request->server['remote_addr']!='127.0.0.1'){
+                $this->log->app_common("EXEC ". implode('/', $mca). " 403 not-interal-ip" );
+                $response->status(404);
+                $response->end();
+                return;
+            }else{
+                
+                try{
+                    $this->doInternalCmd($mca[3], $request, $response);
+                    $this->log->app_common("EXEC ". implode('/', $mca). " 200" );
+                    return;
+                }catch(\ErrorException $ex){
+                    $this->log->app_common("EXEC ". implode('/', $mca). " 503" );
+                }
+            }
         }
 
-        if($mca[1]!=$this->serviceNameInUri){
+        if(!in_array($mca[1], $this->serviceNameInUri)){
+            $this->log->app_common("EXEC ". implode('/', $mca). " 403 invalid-service-name" );
             $response->status(404);
             $response->end();
             return;
@@ -177,44 +447,54 @@ class Server
         $func = $mca[3].'Action';
 
         if(!class_exists($class_name,false)){
-            include $this->baseDir.'/controllers/'.$mca[2].'.php';
+            if(is_readable($this->baseDir.'/controllers/'.$mca[2].'.php')){
+                include $this->baseDir.'/controllers/'.$mca[2].'.php';
+            }else{
+                if($this->whenCtrlMiss==null){
+                    $this->log->app_common("EXEC ". implode('/', $mca). " 503 invalid-controller-name" );
+                    $response->status(404);
+                    $response->end();
+                    return;
+                }else{
+                    $class_name = $this->whenCtrlMiss.'Controller';
+                    if(!class_exists($class_name,false)){
+                        include $this->baseDir.'/controllers/'.$this->whenCtrlMiss.'.php';
+                    }
+                }
+            }
         }
 
         try{
-            $view = new \SingleService\View;
+            $view = $this->_view->cloneone();
             $obj = new $class_name;
-            if(!method_exists($obj, $func)){
-                $this->log->app_error('method:'.$func .' not found on:'.$this->ServiceModuleName.' / '. get_class($obj));
-                $response->status(405);
-                $response->end();
-                return;
-            }else{
-                $obj->initAllFromServer($this->prepareRequest($request),$view,$this->config,$this,$this->log);
-                $obj->initPrjEnv($this->successCode[0],$this->successCode[1],$this->successCode[2],$this->successCode[3]);
-                if($obj->checkBeforeAction()){
-                    $obj->$func();
-                    $obj->doAfterAction(true);
+            $obj->initAllFromServer($this->prepareRequest($request,$mca),$view,$this->config,$this,$this->log);
+            $obj->initPrjEnv($this->successCode[0],$this->successCode[1],$this->successCode[2],$this->successCode[3]);
+            
+            if($obj->checkBeforeAction()){
+                if(!method_exists($obj, $func)){
+                    $this->log->app_common("EXEC ". implode('/', $mca). " 503 invalid-action-name" );
+                    $response->status(405);
+                    $response->end();
+                    return;
                 }else{
-                    $obj->doAfterAction(false);
+                    $obj->$func();
                 }
-            }
-            if(!empty($this->forceCodeAndLocation)){
-                $response->status($this->forceCodeAndLocation[0]);
-                if(!empty($this->forceCodeAndLocation[1])){
-                    $response->header("Location", $this->forceCodeAndLocation[1]);
-                }
-                $this->forceCodeAndLocation=array();
+                $obj->doAfterAction(true);
+            }else{
+                $obj->doAfterAction(false);
             }
             
             $view->renderJson4Swoole($response);
+            $this->log->app_common("EXEC ". implode('/', $mca). " 200" );
         } catch (Exception $ex) {
-            $this->log->app_error($ex->getMessage()."\n".$ex->getTraceAsString());
+            $this->log->app_common("EXEC ". implode('/', $mca). " 503 " .$ex->getMessage()."#".json_encode($ex->getTraceAsString()));
         }
         $this->taskRunning_dec();
     }
-    protected function prepareRequest($request)
+    protected function prepareRequest($request,$mca)
     {
         $req = new \SingleService\Request($request);
+        $req->setMCA($mca[1], $mca[2], $mca[3]);
         $tmp = $request->rawContent();
         
         if(empty($tmp)){
@@ -237,8 +517,10 @@ class Server
         }
         return $req;
     }
+    protected $arrIpPort=array();
     protected function startSwoole($ipListen,$portListen,$workerNum,$taskNum)
     {
+        $this->arrIpPort=array($ipListen,$portListen);
         $this->checkTaskSetting($taskNum);
         $http = new \swoole_http_server($ipListen,$portListen);
         $http->set(array(
@@ -252,9 +534,9 @@ class Server
         $this->swoole = $http;
         $http->on("request", array($this,'dispatch'));
         $http->on("task", array($this, 'onSwooleTask')); 
-        $http->on("finish", array($this, 'onSwooleTaskEnd')); 
-        echo $this->ServiceModuleName." start listening on $portListen";
-        $http->start();
+        $http->on("finish", array($this, 'onSwooleTaskEnd'));
+        $http->on("start", array($this, 'onSwooleStart'));
+
     }
     
     protected function checkTaskSetting($taskNum)
@@ -264,7 +546,7 @@ class Server
                 die('MISSING '.$this->baseDir.'/AsyncTaskDispatcher.php');
             }else{
                 include $this->baseDir.'/AsyncTaskDispatcher.php';
-                $tmp = new \AsyncTaskDispatcher;
+                $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
                 if(!method_exists($tmp, 'onError')){
                     die('MISSING onError() in AsyncTaskDispatcher.php');
                 }
@@ -273,14 +555,18 @@ class Server
     }
     
     // ----------------------------------swoole task 相关
-    public function createSwooleTask($func,$data,$callBackEnd)
+    public function createSwooleTask($func,$data,$callBackEnd=null)
     {
-        $data[KEEPWORD_TASKFUNC_NAME]=$func;
+        $pack = array($func,$data);
         $s = $this;
         if(empty($callBackEnd)){
-            $this->swoole->task($data,-1, array($this,'onSwooleTaskEnd'));
+            if(false===$this->swoole->task($pack,-1, array($this,'onSwooleTaskEnd'))){
+                return false;
+            }else{
+                return true;
+            }
         }else{
-            $this->swoole->task($data,-1, function ($serv,$task_id, $data)use ($s,$callBackEnd){
+            if(false === $this->swoole->task($pack,-1, function ($serv,$task_id, $data)use ($s,$callBackEnd){
                 try{
                     if(is_array($callBackEnd)){
                         call_user_func($callBackEnd, $data);
@@ -290,28 +576,42 @@ class Server
                 } catch (\ErrorException $e){
                     
                 }
-                //error_log("## server:onTaskStart:end". json_encode($data));
                 $s->taskRunning_dec();
-            });
+            })){
+                return false;
+            }else{
+                return true;
+            }
+        }
+    }
+    public function onSwooleStart($server)
+    {
+        
+        if(class_exists('\\AsyncTaskDispatcher',false)){
+            error_log('ignore timeout error of: Operation timed out after 1000 milliseconds with 0 bytes received http://...../onServerStart');
+            $ret = Curl::factory()->httpGet('http://127.0.0.1:'.$this->arrIpPort[1].'/SteadyAsHill/broker/onServerStart',null,null,1);
         }
     }
     public function onSwooleTask($serv, $task_id, $src_worker_id, $data)
     {
         //error_log("## server:onTaskStart:enter". json_encode($data));
         $this->taskRunning_inc();
-            
-        $tmp = new \AsyncTaskDispatcher;
-        $func = $data[KEEPWORD_TASKFUNC_NAME];
-        unset($data[KEEPWORD_TASKFUNC_NAME]);
+        
+        $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
+        $func = $data[0];
+        $this->log->initOnNewRequest('///'.$func,'0.0.0.0');
+        $this->log->app_trace("task-process-info:task_id=$task_id, src_worker_id=$src_worker_id");
         try{
-            $ret = $tmp->$func($data);
+            $tmp->doBeforeTask($func,$data[1]);
+            $ret = $tmp->$func($data[1]);
+            $tmp->doAfterTask($func,$data[1]);
             if(empty($ret)){
                 $this->taskRunning_dec();
             }else{
                 return $ret;
             }
         }catch(\ErrorException $ex){
-            $ret = $tmp->onError($ex, $data);
+            $ret = $tmp->onError($ex, $func, $data[1]);
             if(empty($ret)){
                 $this->taskRunning_dec();
             }else{

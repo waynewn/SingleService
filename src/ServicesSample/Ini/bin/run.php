@@ -1,11 +1,11 @@
 <?php
 //加载自己的autoload
-if(is_readable('autoload.php')){
+//if(is_readable('autoload.php')){
     //注意，默认的模板文件里需要指定两个路径，一个是Sooh2的，一个是公司类库的
-    include 'autoload.php';
-}
+//    include 'autoload.php';
+//}
 
-include 'SingleService/Server.php';//如果autoload里没有相关路由自动加载，include这个
+include '../../../SingleService/Server.php';//如果autoload里没有相关路由自动加载，include这个
 //usage: 
 //php run.php HelloWorld $1 $2 'http://127.0.0.1:9002/ini/broker/getini?name='
 //      0         1       2  3   4
@@ -14,7 +14,7 @@ if($argc!=5){
 }
 
 $sys = \SingleService\Server::factory()
-        ->initServiceModule(__DIR__.'/ServicesSample',$argv[1]) //本次启动的是哪个微服务
+        ->initServiceModule(dirname(dirname(__DIR__)),$argv[1]) //本次启动的是哪个微服务
         ->initLog(
                 \SingleService\Loger::getInstance(7)
                     //->initFileTpl($basedir, $filenameWithSubDir)  // 可以使用变量：{year},{month},{day},{hour},{minute},{second},{type}
@@ -24,5 +24,5 @@ $sys = \SingleService\Server::factory()
         ->initView(new \SingleService\View())//这里可以放上自定义的兼容view处理类
         ->initConfigPath($argv[4])//获取配置文件的路径或url
         ->initAutloadLocalLibrary(true);//自动加载所有模块内的library
-\Sooh2\Misc\Ini::getInstance($sys->getConfig());//如果要使用另一数据库封装库Sooh2，打开这里
+
 $sys->run($argv[2], $argv[3]);

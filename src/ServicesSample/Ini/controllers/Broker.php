@@ -5,9 +5,18 @@
  * @author wangning
  */
 class BrokerController extends \SingleService\ServiceController{
+    //get DB,Email
+    //get str.msgcommon,
+    //
     public function getiniAction()
     {
-        $names = explode(',',trim($this->_request->get('name')));
+        $s = trim($this->_request->get('name'));
+        if($s=='*'){
+            $ret = $this->_Config->dump();
+            $this->_view->assign('ini_static',$ret['default']);
+            return;
+        }
+        $names = explode(',',$s);
 
         if(empty($names)){
             $this->setReturnMsgAndCode('ini-missing',404);
@@ -20,6 +29,12 @@ class BrokerController extends \SingleService\ServiceController{
         }
         $this->_view->assign('ini_static',$ret);
     }
+    public function getlangAction()
+    {
+        $lang=$this->_request->get('lang');
+        
+    }
+
     public function dumpAction()
     {
         $this->_view->assign('all_ini',$this->_Config->dump());
