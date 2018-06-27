@@ -1,8 +1,10 @@
 <?php
 namespace SingleService;
+include_once 'Ret.php';
 include_once 'Config.php';
 include_once 'Curl.php';
 include_once 'Request.php';
+include_once 'View.php';
 include_once 'View.php';
 include_once 'Plugin.php';
 include_once 'Loger.php';
@@ -18,7 +20,7 @@ class Server
     protected $baseDir;
     /**
      *
-     * @var \SingleService\Config 
+     * @var \Sooh\Ini 
      */
     protected $config;
     public static function factory()
@@ -37,13 +39,9 @@ class Server
         $this->log = $log;
         return $this;
     }
-    protected $successCode=array('code',0,'msg','ok');
-    public function initSuccessCode($codeName='code',$value=0,$msgName='message',$msg='success')
+    public function initSuccessCode($codeName='code',$value=0,$msgName='message',$msg='success',$defaultErrCode=-1)
     {
-        $this->successCode[0]=$codeName;
-        $this->successCode[1]=$value;
-        $this->successCode[2]=$msgName;
-        $this->successCode[3]=$msg;
+        \SingleService\Ret::init($codeName, $value, $msgName, $msg, $defaultErrCode);
         return $this;
     }
     protected $wwwroot=null;
@@ -58,7 +56,12 @@ class Server
             die('call initServiceModule() first');
         }
         try{
-            $this->config = \SingleService\Config::getInstance($dirOrUrl,$this->ServiceModuleName);
+            if(substr($dirOrUrl,0,5)=='http:'){
+                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Url($dirOrUrl,$this->ServiceModuleName));
+            }else{
+                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Files($dirOrUrl,$this->ServiceModuleName));
+            }
+            
             $this->serviceNameInUri = explode(',',$this->config->getIni($this->ServiceModuleName.'.SERVICE_MODULE_NAME'));
         }catch(\ErrorException $ex){
             die($ex->getMessage());
@@ -126,13 +129,15 @@ class Server
     public function run($ip='0.0.0.0',$port=9501)
     {
         $this->taskRunning = new \Swoole\Atomic\Long();
-        $this->preloadModuleLibrary($this->baseDir.'/library');
+        $this->reqRunning = new \Swoole\Atomic\Long();
+        
         if($this->_view===null){
             $this->_view=new \SingleService\View;
         }
+        \SingleService\ReqEnvCookie::init($signKey, $SessionName,array());
         $this->startSwoole($ip, $port, 
                 $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_REQUEST'), 
-                $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
+                $this->totalTaskProcess = $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
         $this->log->initOnNewRequest('[start]', '127.0.0.1');
         $this->log->app_trace($this->ServiceModuleName." start listening on $port");
         echo $this->ServiceModuleName." start listening on $port";
@@ -140,10 +145,10 @@ class Server
     }
     public function runTaskOnly($taskFuncname,$paramJsonstring)
     {
-        $this->preloadModuleLibrary($this->baseDir.'/library');
         if($this->_view===null){
             $this->_view=new \SingleService\View;
         }
+        \SingleService\ReqEnvCookie::init($signKey, $SessionName,array());
         $this->startSwoole('127.0.0.1', 0, 
                 $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_REQUEST'), 
                 $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
@@ -175,17 +180,17 @@ class Server
         }
     }
     //------------------------加载项目专属的所有类库 --------------------开始
-    protected $_flgAutoLoadLocalLibrary = false;
     public function initAutloadLocalLibrary($flg=true)
     {
-        $this->_flgAutoLoadLocalLibrary=$flg;
+        if($flg){
+            if(is_dir($this->baseDir.'/library')){
+                $this->preloadModuleLibrary($this->baseDir.'/library');
+            }
+        }
         return $this;
     }
     protected function preloadModuleLibrary($dir)
     {
-        if(!$this->_flgAutoLoadLocalLibrary){
-            return;
-        }
         $parsed = $this->parseAllPHP($this->getAllFiles($dir));
         $loaded=array();
         for($i=0;$i<100000;$i++){
@@ -208,6 +213,11 @@ class Server
         $ret = array();
         foreach($allFiles as $f){
             $s = file_get_contents($f);
+            
+            if(strpos($s, 'interface ')){
+                include $f;
+                continue;
+            }
             
             $pos1 = strpos($s, 'namespace');
             $pos2 = strpos($s, ';', $pos1+9);
@@ -279,22 +289,20 @@ class Server
     //------------------------加载项目专属的所有类库 ----------------------结束
 
     /**
-     * 当前正在运行的任务书数
+     * 当前正在运行的task数
      * @var \Swoole\Atomic\Long
      */
-    protected $taskRunning=0;
-    public function taskRunning_inc()
+    public $taskRunning=0;
+    protected $totalTaskProcess=0;
+    public function getNumFreeTaskProcess()
     {
-        $this->taskRunning->add(1);
+        return $this->totalTaskProcess - $this->taskRunning->get();
     }
-    public function taskRunning_dec()
-    {
-        $this->taskRunning->sub(1);
-    }
-    public function taskRunning_get()
-    {
-        return $this->taskRunning->get();
-    }
+    /**
+     * 当前正在处理的请求数
+     * @var \Swoole\Atomic\Long
+     */
+    public $reqRunning=0;
 
     protected $swoole;
     /**
@@ -310,32 +318,34 @@ class Server
                 $tmp->onServerStart($this);
 
                 $response->header("Content-Type", "application/json");
-                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' first called"}');
+                $response->end(Ret::factoryOk($this->ServiceModuleName.' first called')->toJsonString());
                 return;
             case 'shutdownThisNode':
                 $response->header("Content-Type", "application/json");
-                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' shutting down"}');
+                $response->end(Ret::factoryOk($this->ServiceModuleName.' shutting down')->toJsonString());
                 $this->swoole->shutdown();
                 return;
             case 'getNumProcessRunning':
                 $response->header("Content-Type", "application/json");
-                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' numProcessRunning='.$this->taskRunning->get().'"}');
+                $tmp = Ret::factoryOk()->toArray();
+                $tmp['numRequest']=$this->reqRunning->get();
+                $tmp['numTask']=$this->taskRunning->get();
+                $response->end(json_encode($tmp));
                 return;
             case 'reloadConfig':
                 $response->header("Content-Type", "application/json");
                 $this->config->reload();
-                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"'.$this->ServiceModuleName.' config reloaded"}');
+                $response->end(Ret::factoryOk($this->ServiceModuleName.' config reloaded')->toJsonString());
                 return;
             case 'dumpConfig':
                 $response->header("Content-Type", "application/json");
-                $response->end(json_encode(array(
-                            $this->successCode[0]=>$this->successCode[1],
-                            'all_ini'=>$this->config->dump()
-                        )));
+                $tmp = Ret::factoryOk()->toArray();
+                $tmp['all_ini'] = $this->config->dump();
+                $response->end(json_encode($tmp));
                 return;
             default:
                 $response->header("Content-Type", "application/json");
-                $response->end('{"'.$this->successCode[0].'":'.$this->successCode[1].',"'.$this->successCode[2].'":"unknown cmd: '.$cmd.' for '.$this->ServiceModuleName.'"}');
+                $response->end(Ret::factoryError("unknown cmd: '.$cmd.' for '.$this->ServiceModuleName.'")->toJsonString());
                 return;
         }
     }
@@ -392,11 +402,16 @@ class Server
     }
     public function dispatch($request, $response)
     {
+        $this->reqRunning->add(1);
+        \SingleService\ReqEnvCookie::getInstance($request->cookie);
         if(!empty($request->header['x-forwarded-for'])){
             $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'].','.trim($request->header['x-forwarded-for'],'[]'));
         }else{
             $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr']);
         }
+        $this->config->onNewRequest();
+        $this->config->setRuntime('REQUEST_SN',$this->log->getRequestSN());
+        $this->config->setRuntime('CurServModName', $this->ServiceModuleName);
         $this->log->app_trace('['.$request->server['remote_addr'].']'.$request->server['request_uri']);
         if($this->wwwroot!==null){
             $file = $this->dealwith_www($request->server['request_uri'], $response);
@@ -409,6 +424,7 @@ class Server
                     $response->status(404);
                     $response->end();
                 }
+                $this->reqRunning->sub(1);
                 return;
             }
         }
@@ -419,12 +435,14 @@ class Server
                 $this->log->app_common("EXEC ". implode('/', $mca). " 403 not-interal-ip" );
                 $response->status(404);
                 $response->end();
+                $this->reqRunning->sub(1);
                 return;
             }else{
                 
                 try{
                     $this->doInternalCmd($mca[3], $request, $response);
                     $this->log->app_common("EXEC ". implode('/', $mca). " 200" );
+                    $this->reqRunning->sub(1);
                     return;
                 }catch(\ErrorException $ex){
                     $this->log->app_common("EXEC ". implode('/', $mca). " 503" );
@@ -436,11 +454,9 @@ class Server
             $this->log->app_common("EXEC ". implode('/', $mca). " 403 invalid-service-name" );
             $response->status(404);
             $response->end();
+            $this->reqRunning->sub(1);
             return;
         }
-
-        $this->taskRunning_inc();
-        
         
         $mca[2]=ucfirst($mca[2]);
         $class_name = $mca[2].'Controller';
@@ -454,6 +470,7 @@ class Server
                     $this->log->app_common("EXEC ". implode('/', $mca). " 503 invalid-controller-name" );
                     $response->status(404);
                     $response->end();
+                    $this->reqRunning->sub(1);
                     return;
                 }else{
                     $class_name = $this->whenCtrlMiss.'Controller';
@@ -466,15 +483,17 @@ class Server
 
         try{
             $view = $this->_view->cloneone();
+            $view->setResult(\SingleService\Ret::factoryOk());
             $obj = new $class_name;
             $obj->initAllFromServer($this->prepareRequest($request,$mca),$view,$this->config,$this,$this->log);
-            $obj->initPrjEnv($this->successCode[0],$this->successCode[1],$this->successCode[2],$this->successCode[3]);
+//            $obj->initPrjEnv($this->successCode[0],$this->successCode[1],$this->successCode[2],$this->successCode[3],$this->successCode[4]);
             
             if($obj->checkBeforeAction()){
                 if(!method_exists($obj, $func)){
                     $this->log->app_common("EXEC ". implode('/', $mca). " 503 invalid-action-name" );
                     $response->status(405);
                     $response->end();
+                    $this->reqRunning->sub(1);
                     return;
                 }else{
                     $obj->$func();
@@ -489,7 +508,7 @@ class Server
         } catch (Exception $ex) {
             $this->log->app_common("EXEC ". implode('/', $mca). " 503 " .$ex->getMessage()."#".json_encode($ex->getTraceAsString()));
         }
-        $this->taskRunning_dec();
+        $this->reqRunning->sub(1);
     }
     protected function prepareRequest($request,$mca)
     {
@@ -559,30 +578,26 @@ class Server
     {
         $pack = array($func,$data);
         $s = $this;
-        if(empty($callBackEnd)){
-            if(false===$this->swoole->task($pack,-1, array($this,'onSwooleTaskEnd'))){
-                return false;
-            }else{
-                return true;
-            }
-        }else{
-            if(false === $this->swoole->task($pack,-1, function ($serv,$task_id, $data)use ($s,$callBackEnd){
-                try{
-                    if(is_array($callBackEnd)){
-                        call_user_func($callBackEnd, $data);
-                    }else{
-                        $callBackEnd($data);
-                    }
-                } catch (\ErrorException $e){
-                    
+
+        if(false === $this->swoole->task($pack,-1, function ($serv,$task_id, $data)use ($s,$callBackEnd){
+            try{
+                if($callBackEnd===null){
+
+                }elseif(is_array($callBackEnd)){
+                    call_user_func($callBackEnd, $data);
+                }else{
+                    $callBackEnd($data);
                 }
-                $s->taskRunning_dec();
-            })){
-                return false;
-            }else{
-                return true;
+            } catch (\ErrorException $e){
+
             }
+            $s->taskRunning->sub(1);
+        })){
+            return false;
+        }else{
+            return true;
         }
+
     }
     public function onSwooleStart($server)
     {
@@ -595,36 +610,34 @@ class Server
     public function onSwooleTask($serv, $task_id, $src_worker_id, $data)
     {
         //error_log("## server:onTaskStart:enter". json_encode($data));
-        $this->taskRunning_inc();
-        
-        $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
+        $this->taskRunning->add(1);
         $func = $data[0];
         $this->log->initOnNewRequest('///'.$func,'0.0.0.0');
+        $this->config->onNewRequest($this->log->getRequestSN());
+        $this->config->setRuntime('CurServModName', $this->ServiceModuleName);
+        $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
+
         $this->log->app_trace("task-process-info:task_id=$task_id, src_worker_id=$src_worker_id");
         try{
             $tmp->doBeforeTask($func,$data[1]);
             $ret = $tmp->$func($data[1]);
             $tmp->doAfterTask($func,$data[1]);
             if(empty($ret)){
-                $this->taskRunning_dec();
+                return "process returned nothing, so single-server-framework return this to trigger callback";
             }else{
                 return $ret;
             }
         }catch(\ErrorException $ex){
             $ret = $tmp->onError($ex, $func, $data[1]);
             if(empty($ret)){
-                $this->taskRunning_dec();
+                return "process returned nothing, so single-server-framework return this to trigger callback";
             }else{
                 return $ret;
             }
         }
-
     }
-
     public function onSwooleTaskEnd($serv,$task_id, $data)
     {
-        $this->taskRunning_dec();
+
     }
-    
-   
 }

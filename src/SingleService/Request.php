@@ -52,10 +52,14 @@ class Request {
     }
     public function getCookie($key)
     {
+        if($key!=null){
         if(isset($this->_req->cookie[$key])){
             return $this->_req->cookie[$key];
         }else{
             return null;
+        }
+        }else{
+            return $this->_req->cookie;
         }
     }
     public function getServerHeader($key)

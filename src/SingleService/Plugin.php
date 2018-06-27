@@ -25,32 +25,29 @@ class Plugin {
      */
     protected $_view;
 
-    protected $successCode;
     /**
      *
-     * @var \SingleService\Config 
+     * @var \Sooh\Ini 
      */
     protected $_Config;    
-    public static function factory($request,$view,$config,$log,$successCode)
+    public static function factory($request,$view,$config,$log)
     {
         $c = get_called_class();
         $obj = new $c;
         $obj->_request = $request;
-        $obj->successCode=$successCode;
         $obj->_view=$view;
         $obj->_Config=$config;
         $obj->_log = $log;
         return $obj;
     }
     
-    protected function setReturnMsgAndCode($msg,$errCode=null)
+    protected function returnOK($msg=null)
     {
-        $this->_view->assign($this->successCode[2],$msg);
-        if($errCode!==null){
-            $this->_view->assign($this->successCode[0],$errCode);
-        }else{
-            $this->_view->assign($this->successCode[0],$this->successCode[1]);
+        $this->_view->setResult(\SingleService\Ret::factoryOk($msg));
         }
+    protected function returnError($msg,$code=null)
+    {
+        $this->_view->setResult(\SingleService\Ret::factoryError($msg,$code));
     }    
     /**
      * 在执行action之前调用，返回是否继续执行action

@@ -14,23 +14,25 @@ class ServiceController
             $this->_view->assign($this->successCode[2],$this->successCode[3]);
         }
     }
-    public function initPrjEnv($codeFieldName,$codeFieldSucc,$msgFieldName,$msgFieldSucc)
+    public function initPrjEnv($codeFieldName,$codeFieldSucc,$msgFieldName,$msgFieldSucc,$defaultErrCode)
     {
-        $this->successCode = array($codeFieldName,$codeFieldSucc,$msgFieldName,$msgFieldSucc);
+        //$this->successCode = array($codeFieldName,$codeFieldSucc,$msgFieldName,$msgFieldSucc,$defaultErrCode);
+        
         if(!empty($this->_view)){
             $this->_view->assign($this->successCode[0],$this->successCode[1]);
             $this->_view->assign($this->successCode[2],$this->successCode[3]);
         }
     }
-    
-    protected function setReturnMsgAndCode($msg,$errCode=null)
+    protected function returnOK($msg=null)
     {
-        $this->_view->assign($this->successCode[2],$msg);
-        if($errCode!==null){
-            $this->_view->assign($this->successCode[0],$errCode);
-        }else{
-            $this->_view->assign($this->successCode[0],$this->successCode[1]);
-        }
+        $this->_view->setResult(\SingleService\Ret::factoryOk($msg));
+    }
+    protected function returnError($msg,$code=null)
+    {
+        $this->_view->setResult(\SingleService\Ret::factoryError($msg,$code));
+    }
+    protected function getModuleConfigItem($subname){
+        return $this->_Config->getIni($this->_Config->getRuntime('CurServModName').'.'.$subname);
     }
     /**
      *
@@ -53,7 +55,7 @@ class ServiceController
     
     /**
      *
-     * @var \SingleService\Config 
+     * @var \Sooh\Ini 
      */
     protected $_Config;
 
@@ -88,7 +90,7 @@ class ServiceController
     protected function getPlugin()
     {
         if(class_exists('\\Plugins\\Plugin',false)){
-            $this->_plugin = call_user_func('\\Plugins\\Plugin::factory',$this->_request,$this->_view,$this->_Config,$this->_log,$this->successCode);
+            $this->_plugin = call_user_func('\\Plugins\\Plugin::factory',$this->_request,$this->_view,$this->_Config,$this->_log);
         }
     }
     /**

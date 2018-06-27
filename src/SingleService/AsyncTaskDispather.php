@@ -18,7 +18,7 @@ class AsyncTaskDispather {
     protected $_log;
     /**
      *
-     * @var \SingleService\Config 
+     * @var \Sooh\Ini 
      */
     protected $_Config;
     /**
@@ -63,4 +63,7 @@ class AsyncTaskDispather {
     {
         
     }
+    protected function getModuleConfigItem($subname){
+        return $this->_Config->getIni($this->_Config->getRuntime('CurServModName').'.'.$subname);
+    }    
 }

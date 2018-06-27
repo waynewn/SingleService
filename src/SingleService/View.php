@@ -9,6 +9,18 @@ namespace SingleService;
 class View {
     protected $_arr=array();
 
+    /**
+     * 
+     * @param \SingleService\Ret $ret
+     */
+    public function setResult($ret)
+    {
+        $arr = $ret->toArray();
+        foreach($arr as $k=>$v){
+            $this->_arr[$k]=$v;
+        }
+    }
+    
     public function assign($k,$v)
     {
         $this->_arr[$k]=$v;
@@ -48,7 +60,10 @@ class View {
         }
     }
     protected $forceCodeAndLocation=null;
-    
+    /**
+     * 
+     * @return \SingleService\View
+     */
     public function cloneone()
     {
         $c = get_called_class();

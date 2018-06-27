@@ -19,7 +19,7 @@ class BrokerController extends \SingleService\ServiceController{
         $names = explode(',',$s);
 
         if(empty($names)){
-            $this->setReturnMsgAndCode('ini-missing',404);
+            $this->returnError('ini-missing',404);
             $this->_view->assign('ini_static',array());
             return ;
         }
