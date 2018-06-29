@@ -38,8 +38,8 @@
 
 curl封装，get & post 两种方法
 
-* $ret = Curl::factory($cookies_array)->httpGet($url,$params_get,$headers,$secondsTimeout)
-* $ret = Curl::factory($cookies_array)->httpPost($url,$params_post,$headers,$secondsTimeout)
+* $ret = Curl::factory()->httpGet($url,$params_get,$headers,$secondsTimeout)
+* $ret = Curl::factory()->httpPost($url,$params_post,$headers,$secondsTimeout)
 
 其中，httpPost()中的$params_post是string时，将以raw-data方式post
 
@@ -143,7 +143,7 @@ request的封装，常用方法如下
                 ->initView(new \SingleService\View())//这里可以放上自定义的兼容view处理类
                 ->initSuccessCode('code', 10000, 'message', 'success')//设置默认的返回值中code,message的名称和成功时默认值
                 ->initRawdataDigname('data')//rawdata里data节点的值直接提到上一级，作为request可以直接访问的
-                ->initConfigPath($argv[4])//获取配置文件的路径或url
+                ->initConfigPath($argv[4])//获取配置文件的路径或url，$permanentDriver 使用了了默认的数组驱动（在swoole下，不是实时且可能写覆盖）
                 ->initWWW("/path/to/www")//设置html静态资源路径，开启会影响效率
                 ;
         //如果要使用另一数据库封装库Sooh2，需要下面两行准备好ini和loger

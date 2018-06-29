@@ -62,8 +62,14 @@ class Request {
             return $this->_req->cookie;
         }
     }
-    public function getServerHeader($key)
+    public function getServerHeader($key=null)
     {
+        if($key==null){
+            return array(
+              'server'=>$this->_req->server,
+              'header'=>$this->_req->header,
+            );
+        }
         if(isset($this->_req->server[$key])){
             return $this->_req->server[$key];
         }elseif(isset($this->_req->header[$key])){

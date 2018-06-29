@@ -1,7 +1,7 @@
 {
    "name": "steady-as-hill/single-service-server",
    "description": "single service framework, base on swoole",
-    "keywords": ["service"],
+    "keywords": ["micro-service"],
     "license": "MIT",
     "require": {
 

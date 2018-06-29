@@ -1,9 +1,9 @@
 <?php
 return array(
 //最大异步任务数
-    'MAILSERVICE_MAX_TASK'=>10,
+    'SERVICE_MAX_TASK'=>10,
 //最大同时接收请求数量（同步异步都算）
-    'MAILSERVICE_MAX_REQUEST'=>10,
+    'SERVICE_MAX_REQUEST'=>10,
 //module & ctrl 名称定义
     'SERVICE_MODULE_NAME'=>'MailService',
 //邮箱设置：服务器地址

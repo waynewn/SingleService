@@ -26,13 +26,13 @@
             {
                 $msgtpl = $this->_Config->getIni('Msg.HelloWorld.zhcn');
 
-                $this->setReturnMsgAndCode(sprintf($msgtpl,$this->_request->get('name')));
+                $this->returnOK(sprintf($msgtpl,$this->_request->get('name')));
             }
         }
 
 补充说明：
 
-系统已经替你设置过成功的返回值了，如果需要更改提示或错误，才需要调用setReturnMsgAndCode()
+系统已经替你设置过成功的返回值了，如果需要更改提示或错误，才需要调用returnOK
 
 controller详细的属性方法，参看：[controller详细说明](docs/Controller.md)
 
@@ -68,7 +68,7 @@ request，view等用法，参见：[框架说明](docs/Framework.md)
 		class MissingController extends \SingleService\ServiceController{
 		    public function checkBeforeAction()
 		    {
-				$this->setReturnMsgAndCode('Missing',404);
+				$this->returnError('Missing',404);
 				return false;
 		    }
 		}
@@ -90,7 +90,7 @@ request，view等用法，参见：[框架说明](docs/Framework.md)
                     return true;
                 }else{
                     $this->_view->assign('loginUrl','....');
-                    $this->setReturnMsgAndCode('need login');
+                    $this->returnError('need login',401);
                     return false;
                 }
             }

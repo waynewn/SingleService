@@ -31,8 +31,7 @@ class BrokerController extends \SingleService\ServiceController{
     }
     public function getlangAction()
     {
-        $lang=$this->_request->get('lang');
-        
+        $this->_view->assign('trace',$this->_request->getServerHeader());
     }
 
     public function dumpAction()

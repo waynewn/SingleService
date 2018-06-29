@@ -1,15 +1,5 @@
 <?php
 namespace SingleService;
-include_once 'Ret.php';
-include_once 'Config.php';
-include_once 'Curl.php';
-include_once 'Request.php';
-include_once 'View.php';
-include_once 'View.php';
-include_once 'Plugin.php';
-include_once 'Loger.php';
-include_once 'ServiceController.php';
-include_once 'AsyncTaskDispather.php';
 if(!class_exists('\swoole_http_server',false)){
     dl("swoole.so");
 }
@@ -50,16 +40,19 @@ class Server
         $this->wwwroot = $dir;
         return $this;
     }
-    public function initConfigPath($dirOrUrl)
+    public function initConfigPath($dirOrUrl,$permanentDriver=null)
     {
         if(empty($this->ServiceModuleName)){
             die('call initServiceModule() first');
         }
         try{
+            if($permanentDriver==null){
+                $permanentDriver = new \Sooh\IniClasses\vars();
+            }
             if(substr($dirOrUrl,0,5)=='http:'){
-                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Url($dirOrUrl,$this->ServiceModuleName));
+                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Url($dirOrUrl,$this->ServiceModuleName), $permanentDriver);
             }else{
-                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Files($dirOrUrl,$this->ServiceModuleName));
+                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Files($dirOrUrl,$this->ServiceModuleName), $permanentDriver);
             }
             
             $this->serviceNameInUri = explode(',',$this->config->getIni($this->ServiceModuleName.'.SERVICE_MODULE_NAME'));
@@ -134,12 +127,11 @@ class Server
         if($this->_view===null){
             $this->_view=new \SingleService\View;
         }
-        \SingleService\ReqEnvCookie::init($signKey, $SessionName,array());
         $this->startSwoole($ip, $port, 
                 $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_REQUEST'), 
                 $this->totalTaskProcess = $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
         $this->log->initOnNewRequest('[start]', '127.0.0.1');
-        $this->log->app_trace($this->ServiceModuleName." start listening on $port");
+        $this->log->app_common($this->ServiceModuleName." start listening on $port");
         echo $this->ServiceModuleName." start listening on $port";
         $this->swoole->start();        
     }
@@ -148,7 +140,6 @@ class Server
         if($this->_view===null){
             $this->_view=new \SingleService\View;
         }
-        \SingleService\ReqEnvCookie::init($signKey, $SessionName,array());
         $this->startSwoole('127.0.0.1', 0, 
                 $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_REQUEST'), 
                 $this->config->getIni($this->ServiceModuleName.'.SERVICE_MAX_TASK'));
@@ -315,7 +306,7 @@ class Server
         switch ($cmd){
             case 'onServerStart':
                 $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
-                $tmp->onServerStart($this);
+                $tmp->onServerStart($this,$request);
 
                 $response->header("Content-Type", "application/json");
                 $response->end(Ret::factoryOk($this->ServiceModuleName.' first called')->toJsonString());
@@ -402,15 +393,25 @@ class Server
     }
     public function dispatch($request, $response)
     {
-        $this->reqRunning->add(1);
-        \SingleService\ReqEnvCookie::getInstance($request->cookie);
-        if(!empty($request->header['x-forwarded-for'])){
-            $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'].','.trim($request->header['x-forwarded-for'],'[]'));
-        }else{
-            $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr']);
+        if(defined('SoohServicePorxyUsed')){
+            try{
+                \Sooh\Curl::getInstance($cookieAddons=\Sooh\CurlClasses\CookiesForServiceProxy::factoryByStipulated($request->cookie));
+                $requestSN = $cookieAddons->getRequestSN();
+            }catch(\ErrorException $ex){            //sign error;
+                $this->log->app_error($ex->getMessage().' for '.$request->server['request_uri'].' cookie:'. json_encode($request->cookie));
+            }
         }
-        $this->config->onNewRequest();
-        $this->config->setRuntime('REQUEST_SN',$this->log->getRequestSN());
+        if(empty($requestSN)){
+            $requestSN = md5(gethostname().'-'. getmypid().'-'. microtime(true).'-'.rand(100000,999999));
+        }
+        
+        $this->reqRunning->add(1);
+
+        if(!empty($request->header['x-forwarded-for'])){
+            $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'].','.trim($request->header['x-forwarded-for'],'[]',$requestSN));
+        }else{
+            $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'],$requestSN);
+        }
         $this->config->setRuntime('CurServModName', $this->ServiceModuleName);
         $this->log->app_trace('['.$request->server['remote_addr'].']'.$request->server['request_uri']);
         if($this->wwwroot!==null){
@@ -576,7 +577,7 @@ class Server
     // ----------------------------------swoole task 相关
     public function createSwooleTask($func,$data,$callBackEnd=null)
     {
-        $pack = array($func,$data);
+        $pack = array($func,$data,$this->log->getReqLogSN()."_swooletask");
         $s = $this;
 
         if(false === $this->swoole->task($pack,-1, function ($serv,$task_id, $data)use ($s,$callBackEnd){
@@ -611,9 +612,10 @@ class Server
     {
         //error_log("## server:onTaskStart:enter". json_encode($data));
         $this->taskRunning->add(1);
+        \Sooh\Curl::getInstance([]);
         $func = $data[0];
-        $this->log->initOnNewRequest('///'.$func,'0.0.0.0');
-        $this->config->onNewRequest($this->log->getRequestSN());
+
+        $this->log->initOnNewRequest('///'.$func,'0.0.0.0',$data[2]);
         $this->config->setRuntime('CurServModName', $this->ServiceModuleName);
         $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
 

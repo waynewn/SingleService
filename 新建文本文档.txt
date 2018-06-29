@@ -1,0 +1,53 @@
+改造中容易遗漏的，需要指出这个模块需要的配置列表
+msg gate way
+ini 改由接口获得，有多少影响，语言部分有在用吗？
+user
+session
+usr data cache
+
+
+cd src
+修改启动文件
+
+
+vim autoload.php
+	修改sooh2路径
+	include '/usr/local/openresty/nginx/html/php/Sooh2/'.implode('/', $tmp).'.php'; //Sooh2的路径
+	修改library路径
+    	switch($cmp){//                       公司类库的路径
+     	   case 'Lib':$f = '/usr/local/openresty/nginx/html/php/application/library/Lib/'.implode('/', $tmp).'.php';break;
+     	   case 'Prj':$f = '/usr/local/openresty/nginx/html/php/application/library/Prj/'.implode('/', $tmp).'.php';break; 
+     	   case 'Rpt':$f = '/usr/local/openresty/nginx/html/php/application/library/Rpt/'.implode('/', $tmp).'.php';break;
+    	}
+
+配置文件复制到配置目录下
+cp ServicesSample/_config/Ini.ini.php         /usr/local/openresty/nginx/html/php/conf/
+cp ServicesSample/_config/Email.ini.php       /usr/local/openresty/nginx/html/php/conf/
+cp ServicesSample/_config/EvtGateWay.ini.php  /usr/local/openresty/nginx/html/php/conf/
+
+修改ServiceProxy的配置
+
+路由替换
+
+        <rewrite>
+                <rule from="/platform1/api/addevt" to="/evtgw/broker/add"/>
+                <rule from="/platform2/api/addevt" to="/evtgw/broker/add"/>
+                <rule from="/platform1/api/doevt" to="/evtgw/broker/do"/>
+                <rule from="/platform2/api/doevt" to="/evtgw/broker/do"/>
+        </rewrite>
+
+添加模板（email是替换的）
+
+
+
+
+
+
+
+添加node
+
+        <servers comment="不支持一个ip上部署多个proxyserver">
+                <server ip="127.0.0.1" proxyport="28081" comment="center要能访问到的地址">
+                        <nodes comment="该server里部署了的service node">
+
+                                

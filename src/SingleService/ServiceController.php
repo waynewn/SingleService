@@ -60,15 +60,6 @@ class ServiceController
     protected $_Config;
 
     /**
-     * 
-     * @param array $cookieOriginal
-     * @return \SingleService\Curl
-     */
-    public function getCurl($cookieOriginal=array())
-    {
-        return \SingleService\Curl::factory($cookieOriginal);
-    }
-    /**
      *
      * @var \SingleService\Server 
      */

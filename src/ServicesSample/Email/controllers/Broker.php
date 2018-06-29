@@ -14,9 +14,9 @@ class BrokerController extends \SingleService\ServiceController{
         $content=$this->_request->get('content');
         
         if($this->send($users,$title,$content)){
-            $this->setReturnMsgAndCode('sent');
+            $this->returnOK('sent');
         }else{
-            $this->setReturnMsgAndCode('send failed',500);
+            $this->returnError('send failed',500);
         }
     }
     public function sendAsyncAction()
@@ -32,10 +32,10 @@ class BrokerController extends \SingleService\ServiceController{
                  .'&port='.$this->_Config->getIni('Email.MAILSERVICE_MAILSERVER_SSLPORT'));
         try{
             $this->_serverOfThisSingleService->createSwooleTask('sendMail',$data,null );
-            $this->setReturnMsgAndCode('task accepted');
+            $this->returnOK('task accepted');
         } catch (\ErrorException $ex) {
             $this->errlog($ex->getMessage().'@'.__CLASS__);
-            $this->setReturnMsgAndCode('send failed',500);
+            $this->returnError('send failed',500);
         }
     }
 

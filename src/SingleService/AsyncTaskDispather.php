@@ -24,8 +24,9 @@ class AsyncTaskDispather {
     /**
      * 
      * @param Server $SingleServer
+     * @param swoole\request ,$swooleRequest
      */
-    public function onServerStart($SingleServer)
+    public function onServerStart($SingleServer,$swooleRequest)
     {
         $this->_log->app_trace('server start');
         //$this->startTimer($swoole);

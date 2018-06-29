@@ -38,7 +38,12 @@ class View {
             }
         }else{
             $response->header("Content-Type", "application/json");
-            $response->end(json_encode($this->_arr));
+            $s = json_encode($this->_arr);
+            if($s===false){
+                $response->end('["result can not convert to json"]');
+            }else{
+                $response->end($s);
+            }
         }
     }
     /**

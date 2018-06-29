@@ -7,49 +7,55 @@
 class AgentController extends \SingleService\ServiceController{
     public function sayhiAction()
     {
-        $msgtpl = $this->_Config->getIni('HelloWorld.hello_msg_tpl');
+        $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
+        $this->_view->assign("cookies", $this->_request->getCookie());
+        $this->returnOK('hi,'.$this->_request->get('name'));
 
+    }
+    
+    public function taskAction()
+    {
+        $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
         $this->_serverOfThisSingleService->createSwooleTask(array('taskFrom'=>'broker','seq'=>1), array($this,'onSwooleTaskStart1'), array($this,'onSwooleTaskEnd1'));
-        $this->_serverOfThisSingleService->createSwooleTask(array('taskFrom'=>'broker','seq'=>2), array($this,'onSwooleTaskStart2'), array($this,'onSwooleTaskEnd2'));
-        $this->_serverOfThisSingleService->createSwooleTask(array('taskFrom'=>'broker','seq'=>3), array($this,'onSwooleTaskStart1'), array($this,'onSwooleTaskEnd1'));
-        $this->_serverOfThisSingleService->createSwooleTask(array('taskFrom'=>'broker','seq'=>4), array($this,'onSwooleTaskStart2'), array($this,'onSwooleTaskEnd2'));
-        $this->setReturnMsgAndCode(sprintf($msgtpl,$this->_request->get('name')));
 
+        $this->returnOK('run background and return accept');
+    }
+    
+    public function proxyAction()
+    {
+        $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
+        $serviceProxy = $this->_Config->getIni('ServiceProxy.LocalProxyIPPort');
+        $ret = \Sooh\Curl::getInstance()->httpGet($serviceProxy."/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/agent/sayhi?name='. urlencode($this->_request->get('name')));
+        $this->_view->assign('proxy_result', $ret);
+        $this->returnOK("proxy done");
+    }
+    
+    public function proxy2Action()
+    {
+        $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
+        $serviceProxy = $this->_Config->getIni('ServiceProxy.LocalProxyIPPort');
+        $baseUri = $serviceProxy."/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/agent/';
+        $paramPart = '?name='. urlencode($this->_request->get('name'));
+        $this->_view->assign('proxy_result', \Sooh\Curl::getInstance()->httpGet($baseUri.'/sayhi'.$paramPart));
+        $this->_view->assign('proxy_result2', \Sooh\Curl::getInstance()->httpGet($baseUri.'/proxy'.$paramPart));
+        $this->returnOK("proxy done");
+    }
+    
+    public function getUsrSettingAction()
+    {
+        $this->_view->assign('forServiceProxy', array('UID'=>$this->_request->get('sessionId'),'ROUTE'=>'default'));
+        $this->returnOK("proxy done");
     }
     
     public function flgAction()
     {
-        $o = \Prj\Session::getCopy(array("SessionId"=>'asdfgdfhjh'));
-        $o->load();
-        $o->setField('uid',123);
-        $ret = $o->saveToDB();
-        $this->_view->assign('ret', $ret);
-        $this->setReturnMsgAndCode('Msg.common.server_busy');
-        $this->_view->assign('extendInfo', array('flgA'=>time().'#'.$this->_request->get('flg').'@u:'.$this->_request->get('uid')));
+//        $o = \Prj\Session::getCopy(array("SessionId"=>'asdfgdfhjh'));
+//        $o->load();
+//        $o->setField('uid',123);
+//        $ret = $o->saveToDB();
+//        $this->_view->assign('ret', $ret);
+//        $this->returnOK('Msg.common.server_busy');
+//        $this->_view->assign('extendInfo', array('flgA'=>time().'#'.$this->_request->get('flg').'@u:'.$this->_request->get('uid')));
     }
 
-
-    public function onSwooleTaskEnd1($serv, $task_id, $data)
-    {
-        error_log("TTAASSKK # agent:".__FUNCTION__.':'. json_encode($data));
-    }
-    
-    public function onSwooleTaskEnd2($serv, $task_id, $data)
-    {
-        error_log("TTAASSKK # agent:".__FUNCTION__.':'. json_encode($data));
-    }
-    
-
-    
-    public function onSwooleTaskStart1($serv, $task_id, $src_worker_id, $data)
-    {
-        error_log("TTAASSKK # aegnt:".__FUNCTION__.':'. json_encode($data));
-        return $this->send($data['users'], $data['title'], $data['content']);
-    }
-    
-    public function onSwooleTaskStart2($serv, $task_id, $src_worker_id, $data)
-    {
-        error_log("TTAASSKK # aegnt:".__FUNCTION__.':'. json_encode($data));
-        return $this->send($data['users'], $data['title'], $data['content']);
-    }
 }

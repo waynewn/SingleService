@@ -1,12 +1,21 @@
 # 关于配置的说明
 
+代码中可以通过
+config->getIni("a.b.c")获取相应配置
+另外，可以通过 Config->getRuntime('CurServModName') 获取当前的实际模块名
+
+比如，当拿出Sameple里的实例时，你可能会改模块名（需要改路径名和bin下相关脚本里），这时，代码里就需要下面的写法：
+
+        config->getIni( Config->getRuntime('CurServModName') . ".b.c" )
+
+
 ## 主配置
 
 每个微服务有个主配置文件，文件名同模块名（重申：不是服务名），主配置至少包含：
 
 * 最大异步任务数： SERVICE_MAX_TASK， 如果没有异步task需求，这里给0
 * 最大同时接收请求数量：SERVICE_MAX_REQUEST
-* 服务名： SERVICE_MODULE_NAME，逗号分割，根据需要修改，用于避免跟现有的冲突，以及强制版本升级
+* 服务名（不是模块名）： SERVICE_MODULE_NAME，逗号分割，根据需要修改，用于避免跟现有的冲突，以及强制版本升级
 * 需要额外加载的其他配置，NeedsMoreIni，英文逗号分割列出所需的其他配置，*是Ini用的，表示加载找到的所有配置
 
 ## 启动获取和重载

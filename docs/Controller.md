@@ -23,6 +23,10 @@ sys_error(var1,var2) 错误日志（系统）
 主要方法：
 
 get(key) 
+getCookie(key=null)
+getServerHeader(key=null)
+setParam(key) 在request上设置自定义值（随request传递）
+getParam(key, value) 在request上取出自定义值
 
 当rawdata提交json格式参数时，反串行化后的根节点也可以通过get方式获得。另外，通过入口文件的run里调用server->initRawdataDigname('data')后，get()可以获得data节点下的数据（注意：此时如果出现重名节点，数据会丢失）
 
@@ -36,7 +40,8 @@ assign(k, v)
 
 主要方法
 
-getIni
+getIni('a.b.c')
+getRuntime('a.b.c')
 
 *因目前没对语言文字做相应封装处理，这里可以把文字当ini管理*
 
@@ -53,6 +58,15 @@ createSwooleTask($taskName,$taskData,$funcCallback);
 
 
 ## 函数
+
+### 成员函数 getModuleConfigItem(subitem)
+
+提供了快捷方式获取模块专属配置，举例来说，对于HelloWorld模块，下面三种写法等价
+
+$this->_Config->getIni("HelloWorld.abc")
+$this->_Config->getIni($this->_Config->getRuntime('CurServModName').".abc")
+$this->getModuleConfigItem('abc')
+
 
 ### 成员函数 checkBeforeAction()
 
@@ -101,15 +115,14 @@ checkBeforeAction()那里，如果发现了\Plugins\Plugin类，这里会执行�
 设置http-code（比如404）
 
 
-### 成员函数 getCurl($cookie)
 
-获得curl封装类,参数是请求时cookie的值
+### 成员函数 returnOk($msg)
 
-curl常用方法 httpGet 和 httpPost,具体参看 \SingleService\Curl
+设置成功情况下返回的message
 
-### 成员函数 setReturnMsgAndCode($msg, $code=null)
+### 成员函数 returnError($msg, $code=null)
 
-设置返回的code和message
+设置失败情况下返回的code和message
 
 * 默认返回是成功（就算不调用这个函数，也会有成功的数据）
 * 返回时节点是叫code还是其他什么，成功的默认值是0还是其他，是在run.php入口那里通过->initSuccessCode('code', 10000, 'message', 'success')设置的
