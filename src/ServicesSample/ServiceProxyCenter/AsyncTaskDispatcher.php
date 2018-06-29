@@ -12,9 +12,12 @@ class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
     public function onServerStart($SingleServer,$swooleRequest)
     {
         $modName = $this->_Config->getRuntime('CurServModName');
+        
         $this->_Config->permanent->sets('locationOfXML',$xmlFile = $this->_Config->getIni("$modName.LocOfServiceProxyXML"));
+        error_log('server start....'.$modName.':'.$xmlFile);
         try{
-            $this->_Config->permanent->sets('centerConfig', \Sooh\ServiceProxy\Config\XML2CenterConfig::parse($xmlFile));
+            $this->_Config->permanent->sets('centerConfig', $ttttt=\Sooh\ServiceProxy\Config\XML2CenterConfig::parse($xmlFile));
+            error_log(var_export($ttttt,true));
         }catch(\ErrorException $ex){
             $msg = "error:".$ex->getMessage()." when parse ServiceProxy config:".$xmlFile;
             echo $msg;

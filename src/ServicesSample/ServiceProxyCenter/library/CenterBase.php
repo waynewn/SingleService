@@ -1,8 +1,5 @@
 <?php
 namespace Sys;
-include __DIR__.'/CenterAlert.php';
-include __DIR__.'/Util/Curl.php';
-include __DIR__.'/Coroutione/Clients.php';
 
 /**
  * 中央控制

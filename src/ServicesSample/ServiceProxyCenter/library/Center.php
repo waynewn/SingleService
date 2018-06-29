@@ -1,10 +1,5 @@
 <?php
 namespace Sys;
-include __DIR__.'/Config/ProxyConfig.php';
-include __DIR__.'/Config/CenterConfig.php';
-include __DIR__.'/Config/MonitorConfig.php';
-include __DIR__.'/Config/LogConfig.php';
-include __DIR__.'/CenterReport.php';
 
 /**
  * 中央控制

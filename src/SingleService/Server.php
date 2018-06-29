@@ -47,14 +47,14 @@ class Server
         }
         try{
             if($permanentDriver==null){
-                $permanentDriver = new \Sooh\IniClasses\vars();
+                $permanentDriver = new \Sooh\IniClasses\Vars();
             }
             if(substr($dirOrUrl,0,5)=='http:'){
                 $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Url($dirOrUrl,$this->ServiceModuleName), $permanentDriver);
             }else{
-                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Files($dirOrUrl,$this->ServiceModuleName), $permanentDriver);
+                $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Files(realpath($dirOrUrl),$this->ServiceModuleName), $permanentDriver);
             }
-            
+
             $this->serviceNameInUri = explode(',',$this->config->getIni($this->ServiceModuleName.'.SERVICE_MODULE_NAME'));
         }catch(\ErrorException $ex){
             die($ex->getMessage());
@@ -540,6 +540,7 @@ class Server
     protected $arrIpPort=array();
     protected function startSwoole($ipListen,$portListen,$workerNum,$taskNum)
     {
+        error_log($this->ServiceModuleName.' '.__FUNCTION__."($ipListen,$portListen,$workerNum,$taskNum)");
         $this->arrIpPort=array($ipListen,$portListen);
         $this->checkTaskSetting($taskNum);
         $http = new \swoole_http_server($ipListen,$portListen);
@@ -561,6 +562,7 @@ class Server
     
     protected function checkTaskSetting($taskNum)
     {
+        error_log(__FUNCTION__.'----'. var_export($this->config->dump(),true));
         if($taskNum>0){
             if(!is_file($this->baseDir.'/AsyncTaskDispatcher.php')){
                 die('MISSING '.$this->baseDir.'/AsyncTaskDispatcher.php');
@@ -602,10 +604,10 @@ class Server
     }
     public function onSwooleStart($server)
     {
-        
+        error_log(__FUNCTION__.'----'. var_export($this->config->dump(),true));
         if(class_exists('\\AsyncTaskDispatcher',false)){
             error_log('ignore timeout error of: Operation timed out after 1000 milliseconds with 0 bytes received http://...../onServerStart');
-            $ret = Curl::factory()->httpGet('http://127.0.0.1:'.$this->arrIpPort[1].'/SteadyAsHill/broker/onServerStart',null,null,1);
+            $ret = \Sooh\Curl::factory()->httpGet('http://127.0.0.1:'.$this->arrIpPort[1].'/SteadyAsHill/broker/onServerStart',null,null,1);
         }
     }
     public function onSwooleTask($serv, $task_id, $src_worker_id, $data)

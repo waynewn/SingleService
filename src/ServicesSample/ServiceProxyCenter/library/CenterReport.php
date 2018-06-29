@@ -1,7 +1,6 @@
 <?php
 namespace Sys;
 use \Sooh\ServiceProxy\Util\Funcs as Funcs;
-include __DIR__.'/CenterBase.php';
 
 /**
  * 中央控制

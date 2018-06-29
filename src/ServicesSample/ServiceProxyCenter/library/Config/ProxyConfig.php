@@ -1,6 +1,6 @@
 <?php
 namespace Sooh\ServiceProxy\Config;
-include __DIR__.'/../LoadBalance/RoundRobin.php';
+//include __DIR__.'/../LoadBalance/RoundRobin.php';
 /**
  * 代理节点的配置项
  *
@@ -73,7 +73,7 @@ class ProxyConfig {
      *
      * @var \Sooh\ServiceProxy\LoadBalance\RoundRobin 
      */
-    protected $loadBalance=null;
+    //protected $loadBalance=null;
     /**
      * 本机上部署了哪些节点，启动停止等管理命令的地址是多少
      * @var type 
@@ -105,12 +105,12 @@ class ProxyConfig {
         if(defined('HEADER_TRANSFER') && strlen(HEADER_TRANSFER)>0){
             $this->headerTransfer = explode(',', HEADER_TRANSFER);
         }
-        if($this->loadBalance===null){
-            $this->loadBalance = new \Sooh\ServiceProxy\LoadBalance\RoundRobin();
-            if(!is_scalar($this->rewriteRuleIndex)){
-                $this->loadBalance->workAsGlobal();
-            }
-        }
+//        if($this->loadBalance===null){
+//            $this->loadBalance = new \Sooh\ServiceProxy\LoadBalance\RoundRobin();
+//            if(!is_scalar($this->rewriteRuleIndex)){
+//                $this->loadBalance->workAsGlobal();
+//            }
+//        }
         if(!empty($newObj->nodename)){
             $this->setNodename($newObj->nodename);
         }
@@ -290,49 +290,49 @@ class ProxyConfig {
      */
     public function getRouteFor($serviceCmd0,$timestamp,$num=1)
     {
-        $serviceCmd = $this->getRewrite($serviceCmd0);
-
-        $pos = strpos($serviceCmd, '/',1);
-        if($pos===false){
-            $m = strtolower(trim($serviceCmd,'/'));
-        }else{
-            $m  = strtolower(trim(substr($serviceCmd, 0,$pos),'/'));
-        }
-        
-        $serviceMap = $this->getServiceMap($m);
-        if(empty($serviceMap)){
-            return null;
-        }else{
-            $router2 = $this->loadBalance->chose($serviceMap,$m,$timestamp,$num);
-            if($router2!=null){
-                for($i=0;$i<$num;$i++){
-                    if($router2[$i]){
-                        $router2[$i]->cmd=$serviceCmd;
-                    }
-                }
-                return $router2;
-            }else{
-                return null;
-            }
-        }
+//        $serviceCmd = $this->getRewrite($serviceCmd0);
+//
+//        $pos = strpos($serviceCmd, '/',1);
+//        if($pos===false){
+//            $m = strtolower(trim($serviceCmd,'/'));
+//        }else{
+//            $m  = strtolower(trim(substr($serviceCmd, 0,$pos),'/'));
+//        }
+//        
+//        $serviceMap = $this->getServiceMap($m);
+//        if(empty($serviceMap)){
+//            return null;
+//        }else{
+//            $router2 = $this->loadBalance->chose($serviceMap,$m,$timestamp,$num);
+//            if($router2!=null){
+//                for($i=0;$i<$num;$i++){
+//                    if($router2[$i]){
+//                        $router2[$i]->cmd=$serviceCmd;
+//                    }
+//                }
+//                return $router2;
+//            }else{
+//                return null;
+//            }
+//        }
     }
     
-    public function markNodeDown($ip,$port,$timestamp)
-    {
-        $this->loadBalance->markNodeDown($ip, $port, $timestamp);
-    }
-    public function loadbalanceStatus()
-    {
-        return $this->loadBalance->status();
-    }
-    public function proxyEnd($location){
-        $this->loadBalance->onProxyEnd($location);
-    }
-    public function proxyStart($location){
-        $this->loadBalance->onProxyStart($location);
-    }
-    public function proxyCounterReset()
-    {
-        return $this->loadBalance->proxyCounterReset();
-    }
+//    public function markNodeDown($ip,$port,$timestamp)
+//    {
+//        $this->loadBalance->markNodeDown($ip, $port, $timestamp);
+//    }
+//    public function loadbalanceStatus()
+//    {
+//        return $this->loadBalance->status();
+//    }
+//    public function proxyEnd($location){
+//        $this->loadBalance->onProxyEnd($location);
+//    }
+//    public function proxyStart($location){
+//        $this->loadBalance->onProxyStart($location);
+//    }
+//    public function proxyCounterReset()
+//    {
+//        return $this->loadBalance->proxyCounterReset();
+//    }
 }

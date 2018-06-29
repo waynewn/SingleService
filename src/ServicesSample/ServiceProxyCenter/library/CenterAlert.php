@@ -1,6 +1,6 @@
 <?php
 namespace Sys;
-include __DIR__.'/Microservice.php';
+
 /**
  * 把报警抽出来了
  *

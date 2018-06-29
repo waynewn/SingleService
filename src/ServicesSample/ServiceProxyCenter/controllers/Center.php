@@ -16,7 +16,8 @@ class CenterController extends \SingleService\ServiceController{
     
     protected function writeCmdLog($args)
     {
-        $this->log->syslog($this->_request->getActionName().':'. json_encode($args));
+        error_log("[TODO sooh-loger]".$this->_request->getActionName().':'. json_encode($args));
+        //$this->_log->app_common($this->_request->getActionName().':'. json_encode($args));
     }
     
     public function getProxyConfigAction()
@@ -24,11 +25,14 @@ class CenterController extends \SingleService\ServiceController{
         $remoteAddr = $this->_request->getServerHeader('remote_addr');
         $this->writeCmdLog(array('proxyip'=>$remoteAddr));
         $proxyStr = $this->getCenterConfig()->proxy[$remoteAddr];
+        error_log("config ==========================================\n".var_export($this->getCenterConfig(),true));
         if(empty($proxyStr)){
             $this->setHttpCode(404);
         }else{
             $tmp = $this->getProxyConfigObjFromStr($proxyStr);
+            error_log($tmp);
             $arr = json_decode($tmp->toString(true),true);
+            error_log(var_export($arr,true));
             foreach($arr as $k=>$v){
                 $this->_view->assign($k, $v);
             }
