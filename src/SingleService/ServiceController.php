@@ -2,6 +2,10 @@
 namespace SingleService;
 class ServiceController
 {
+    protected function getRequestTime()
+    {
+        return $this->_request->getServerHeader('request_time');
+    }
     public function initAllFromServer($request,$view,$config,$server,$log)
     {
         $this->_request=$request;
@@ -23,11 +27,11 @@ class ServiceController
             $this->_view->assign($this->successCode[2],$this->successCode[3]);
         }
     }
-    protected function returnOK($msg=null)
+    protected function setReturnOK($msg=null)
     {
         $this->_view->setResult(\SingleService\Ret::factoryOk($msg));
     }
-    protected function returnError($msg,$code=null)
+    protected function setReturnError($msg,$code=null)
     {
         $this->_view->setResult(\SingleService\Ret::factoryError($msg,$code));
     }
@@ -104,7 +108,7 @@ class ServiceController
      * 设置 httpcode (重定向不需要这里设置301)
      * @param type $code
      */
-    protected function setHttpCode($code)
+    protected function setReturnHttpCode($code)
     {
         $this->_view->httpCodeAndNewLocation($code);
     }
@@ -112,7 +116,7 @@ class ServiceController
      * 设置重定向
      * @param type $newLocation
      */
-    protected function redirect($newLocation)
+    protected function setReturnRedirect($newLocation)
     {
         $this->_view->httpCodeAndNewLocation(301,$newLocation);
     }

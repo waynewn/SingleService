@@ -106,21 +106,21 @@ action之后，需要执行的。
 checkBeforeAction()那里，如果发现了\Plugins\Plugin类，这里会执行该plugin的doAfterAction($actionExecuted)
 
 
-### 成员函数 redirect($newLocation)
+### 成员函数 setReturnRedirect($newLocation)
 
 设置重定向地址
 
-###  成员函数 setHttpCode($code)
+###  成员函数 setReturnHttpCode($code)
 
 设置http-code（比如404）
 
 
 
-### 成员函数 returnOk($msg)
+### 成员函数 setReturnOK($msg)
 
 设置成功情况下返回的message
 
-### 成员函数 returnError($msg, $code=null)
+### 成员函数 setReturnError($msg, $code=null)
 
 设置失败情况下返回的code和message
 

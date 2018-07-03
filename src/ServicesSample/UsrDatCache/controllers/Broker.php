@@ -134,17 +134,17 @@ class BrokerController extends \SingleService\ServiceController{
         }else{
             $ret0 = $curl->httpPost($url,$post);
         }
-        if($curl->httpCodeLast!==200 || empty($ret0)){
-            $this->_log->app_error('try  get config from ini-service failed httpCode='.$curl->httpCodeLast.' response='.$ret0);
+        if($curl->httpCodeLast!==200 || empty($ret0->body)){
+            $this->_log->app_error('try  get config from ini-service failed httpCode='.$curl->httpCodeLast.' response='.$ret0->body);
             return null;
         }
-        if(!is_array($ret0)){
-            $ret = json_decode($ret0,true);
+        if(!is_array($ret0->body)){
+            $ret = json_decode($ret0->body,true);
         }else{
-            $ret = $ret0;
+            $ret = $ret0->body;
         }
         if(!is_array($ret)){
-            $this->_log->app_error('try  get config from ini-service failed httpCode='.$curl->httpCodeLast.' response='.$ret0);
+            $this->_log->app_error('try  get config from ini-service failed httpCode='.$curl->httpCodeLast.' response='.$ret0->body);
             return null;
         }
         $loc = explode('.', $ini['jsonLoc']);

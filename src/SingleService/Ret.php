@@ -12,6 +12,11 @@ class Ret {
         $this->code = $code;
         $this->msg = $msg;
     }
+    
+    public function isOk()
+    {
+        return $this->code == self::$preDefined[1];
+    }
     /**
      * 生成成功的结果
      * @param string $msg null表示使用默认的

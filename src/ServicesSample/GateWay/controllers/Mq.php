@@ -13,12 +13,12 @@ class MqController extends \SingleService\ServiceController{
 
         $this->queName = ucfirst($this->_request->get('quename'));
         if(empty($this->queName)){
-            $this->returnError("这里只接收：");
+            $this->setReturnError("这里只接收：");
             return false;
         }
         $this->queData = $this->_request->get('quedata');
         if($this->queData[0]!='{' || $this->queData[strlen($this->queData)-1]!='}'){
-            $this->returnError("数据的格式不是json的");
+            $this->setReturnError("数据的格式不是json的");
             return false;
         }
         return true;
@@ -43,12 +43,12 @@ class MqController extends \SingleService\ServiceController{
             $driver = \GWLibs\MsgQue\Broker::factory($this->_Config->getIni('MQDriver.'.$driverId));
             $ret = $driver->sendData($this->queName, $this->queData);
             if($ret->code==0){
-                return $this->returnError("sent");
+                return $this->setReturnError("sent");
             }else{
-                return $this->returnError("send failed:".$ret->msg);
+                return $this->setReturnError("send failed:".$ret->msg);
             }
         }else{
-            return $this->returnError("driver not found");
+            return $this->setReturnError("driver not found");
         }
     }
     /**
@@ -68,7 +68,7 @@ class MqController extends \SingleService\ServiceController{
         }
         
         $ret = \GWLibs\Task\Dispatcher::one($this->queName, $this->queData,$this->_Config,$this->_log);
-        return $this->returnError($ret['msg'],$ret['code']);
+        return $this->setReturnError($ret['msg'],$ret['code']);
     }
     
     /**
@@ -90,6 +90,6 @@ class MqController extends \SingleService\ServiceController{
         $ret = \GWLibs\Task\Dispatcher::one($this->queName, $this->queData,$this->_Config,$this->_log);
         $this->addAction();
         
-        return $this->returnError($ret->msg,$ret->code);//注意，这里用了 returnError，即使是成功的
+        return $this->setReturnError($ret->msg,$ret->code);//注意，这里用了 returnError，即使是成功的
     }    
 }

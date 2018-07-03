@@ -12,12 +12,11 @@ class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
     public function onServerStart($SingleServer,$swooleRequest)
     {
         $modName = $this->_Config->getRuntime('CurServModName');
-        
         $this->_Config->permanent->sets('locationOfXML',$xmlFile = $this->_Config->getIni("$modName.LocOfServiceProxyXML"));
-        error_log('server start....'.$modName.':'.$xmlFile);
         try{
-            $this->_Config->permanent->sets('centerConfig', $ttttt=\Sooh\ServiceProxy\Config\XML2CenterConfig::parse($xmlFile));
-            error_log(var_export($ttttt,true));
+            $ttttt=\Sooh\ServiceProxy\Config\XML2CenterConfig::parse($xmlFile);
+            $ttttt->envIni['MICRO_SERVICE_MODULENAME']=$this->getModuleConfigItem('SERVICE_MODULE_NAME');
+            \Sooh\ServiceProxy\Config\CenterConfig::setInstance($this->_Config, $ttttt);
         }catch(\ErrorException $ex){
             $msg = "error:".$ex->getMessage()." when parse ServiceProxy config:".$xmlFile;
             echo $msg;
@@ -26,30 +25,30 @@ class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
             return;
         }
         
-        swoole_timer_tick($this->_Config->getIni("$modName.Timer_Interval_MS")*60000,function ($timer_id, $tickCounter) use ($SingleServer,$modName){
-                
+    }
+    
+    protected function onTimer($server,$tickCounter)
+    {
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $curl = \Sooh\Curl::getInstance();
         $allProxy = array();
-        foreach ($this->config->proxy as $s){
-            $tmp = $this->getProxyConfigObjFromStr($s);
+        foreach ($centerConfig->proxy as $s){
+            $tmp = \Sooh\ServiceProxy\Config\XML2CenterConfig::getProxyConfigObjFromStr($s,$centerConfig);
             $allProxy[$tmp->myIp]=$tmp->myPort;
         }
         
         foreach($allProxy as $proxyIp=>$proxyPort){
-            $ret = $curl->httpGet("http://$proxyIp:$proxyPort/".MICRO_SERVICE_MODULENAME.'/proxy/gatherByCenter');
+            $ret = $curl->httpGet("http://$proxyIp:$proxyPort/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/gatherByCenter')->body;
             $arr = json_decode($ret,true);
             if(is_array($arr)){
                 foreach($arr['proxy_sum'] as $ipport=>$num){
-                    $this->log->syslog('proxyCounter '.$proxyIp.' => '.$ipport.' '.$num);
+                    $this->_log->app_trace('proxyCounter '.$proxyIp.' => '.$ipport.' '.$num);
                 }
             }else{
-                $this->log->syslog('proxyCounterMiss '.$proxyIp.' http-code:'.$curl->httpCodeLast);
+                $this->_log("TODO error report on proxy down");
+                //$server->createSwooleTask();
+                $this->_log->app_trace('proxyCounterMiss '.$proxyIp.' http-code:'.$curl->httpCodeLast);
             }
         }
-                
-        },null);
-
     }
-    
-
 }

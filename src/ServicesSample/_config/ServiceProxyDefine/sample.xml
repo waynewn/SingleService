@@ -1,14 +1,11 @@
 <?xml version='1.0' encoding="utf-8"?>
-<application version="1.0.2" templates="/root/ServiceProxy/src/config/sampleTpl.xml" centerIp='192.168.4.240' centerPort='9001' comment="comment是写的注释">
+<application version="1.0.2" node_templates="/root/vendor/steady-as-hill/single-service-server/src/ServicesSample/_config/ServiceProxyDefine/sampleTpl.xml" centerIp='192.168.4.240' centerPort='9001' comment="comment是写的注释">
 <runtime_ini comment="重启后才能生效">
-            <item name="MICRO_SERVICE_MODULENAME" value="ServiceProxy" comment="如果系统里已经存在名为 ServiceProxy 的项目了，这里改下"/>
             <item name="EXPIRE_SECONDS_NODE_FAILED" value="300" comment="投递失败的节点，多久后再次尝试"/>
-            <item name="MAX_TASK_NUM" value="10" comment="最大可fork的task任务数"/>
             <item name="PROXY_TIMEOUT" value="1" comment="proxy代理请求时超时的设置（单位秒）"/>
             <item name="MAX_REWRITE" value="20" comment="整个系统最多支持多少条rewrite"/>
             <item name="MAX_SERVICES" value="10" comment="整个系统最多支持多少个ServiceModule"/>
             <item name="MAX_NODE_PER_SERVICE" value="3" comment="每个ServiceModule最多有多少个node实例提供服务"/>
-		<item name="CENTER_TIMER_MINUTE" value="1" comment="center定时任务的时间间隔（分钟）,"/>
 
             <item name="ServcieProxySignkey" value="12345678" comment="微服务内部代理时，cookie里的签名字段用的key"/>
             <item name="CookieNameForSign" value="SignForSerivceProxy" comment="微服务内部代理时，cookie里的签名字段"/>
@@ -20,14 +17,15 @@
             <item name="GetUidBySession" value="forServiceProxy@http://127.0.0.1:9002/hello/agent/getUsrSetting?sessionId=" comment="http://.../getUidOnly?sessionId=xxxxxxxxxxxxxxx，找到了返回uid,没找到返回null(不要json格式返回)"/>
 
 
-        </runtime_ini>	<log dir="/root/ServiceProxy/log" comment="日志存放路径" />
+        </runtime_ini>	
+        <log dir="/root/ServiceProxy/log" comment="日志存放路径" />
 	<monitor>
             <services ><service type='email' uri='/MailService/Broker/sendAsync'/></services>
             <usergroup><group type='ErrorNode' data='wangning@zhangyuelicai.com,zuochenggang@zhangyuelicai.com'/></usergroup>
         </monitor>
         <rewrite>
-		<rule from="/aa/bb/c" to="/aa/bb/sayhi"/>
-		<rule from="/aa/bb/cc" to="/aa/bb/sayhi_proxy"/>
+		<rule from="/test/rewrite/a" to="/hello/agend/sayhi"/>
+		<rule from="/test/rewrite/b" to="/hello/agend/proxy"/>
 	</rewrite>
 
 	<servers comment="不支持一个ip上部署多个proxyserver">
@@ -37,6 +35,7 @@
 				<instance name="hello01" templateId="helloTpl" />
 				<instance name="ini01" templateId="iniServTpl"  />
 				<instance name="dataStatus01" templateId="DataStatusTpl"  />
+                                <instance name="dataStatus02" templateId="DataStatusTpl" port="19999" />
 			</nodes>
 		</server>
 	</servers>

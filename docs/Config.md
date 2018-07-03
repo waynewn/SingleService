@@ -8,6 +8,7 @@ config->getIni("a.b.c")获取相应配置
 
         config->getIni( Config->getRuntime('CurServModName') . ".b.c" )
 
+==================>改变路由方案，不需要active&deactive操作，重新加载配置就好
 
 ## 主配置
 
@@ -17,6 +18,7 @@ config->getIni("a.b.c")获取相应配置
 * 最大同时接收请求数量：SERVICE_MAX_REQUEST
 * 服务名（不是模块名）： SERVICE_MODULE_NAME，逗号分割，根据需要修改，用于避免跟现有的冲突，以及强制版本升级
 * 需要额外加载的其他配置，NeedsMoreIni，英文逗号分割列出所需的其他配置，*是Ini用的，表示加载找到的所有配置
+* Timer_Interval_MS ：多少毫秒触发一次定时任务(AsyncTaskDispatcher->onTimer), =0表示不需要定时任务，<0 表示临时暂停定时任务(恢复时改回>0,重载配置，注意不是立即触发ontimer)
 
 ## 启动获取和重载
 
@@ -29,6 +31,19 @@ config->getIni("a.b.c")获取相应配置
 
 - /SteadyAsHill/broker/reloadConfig 重新加载刷新配置文件（部分无效，比如上面提到的SERVICE_MAX_TASK和SERVICE_MAX_REQUEST， 以及其他在Server启动时使用的参数）
 - /SteadyAsHill/broker/dumpConfig 当前配置一览
+
+## config 使用
+
+config (Sooh/Ini)
+
+它的runtime在每接收到一个请求的时候会被清空，然后设置：
+
+* CurServModName 当前项目的模块名
+
+它的permanent，是简单的数组管理的，没有使用共享内存之类的，所以只能保存不频繁更新，不怕冲突覆盖的：
+
+* permanent->sets('shuttingDown',true)  当收到shutdown命令时，会设置
+
 
 ## 配置文件支持两种格式
 

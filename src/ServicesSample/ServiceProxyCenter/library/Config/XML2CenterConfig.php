@@ -6,6 +6,27 @@ namespace Sooh\ServiceProxy\Config;
  * @author wangning
  */
 class XML2CenterConfig {
+    /**
+     * 反串行化还原出 ProxyConfig
+     * 
+     * @return \Sooh\ServiceProxy\Config\ProxyConfig
+     */
+    public static function getProxyConfigObjFromStr($str,$centerConfig)
+    {
+        $tmp = \Sooh\ServiceProxy\Config\ProxyConfig::factory($str);
+        $tmp->setServiceMap($centerConfig->getServiceMap());
+        $tmp->LogConfig = $centerConfig->LogConfig;
+        $tmp->monitorConfig = $centerConfig->monitorConfig;
+        $tmp->envIni = $centerConfig->envIni;
+        $tmp->centerIp = $centerConfig->centerIp;
+        $tmp->centerPort=$centerConfig->centerPort;
+        foreach($centerConfig->nodeLocation as $nodename=>$ipport){
+            $tmp->nodename[ $ipport['ip'].':'.$ipport['port'] ]=$nodename;
+        }
+        $tmp->setRewrite($centerConfig->getRewrite());
+        return $tmp;
+    }
+    
     public static function getIp($var)
     {
         $parts = explode('.',$var);
@@ -30,7 +51,7 @@ class XML2CenterConfig {
     public static function parse($file)
     {
         if (!is_file($file)){
-            throw new \ErrorException('xml file not found');
+            throw new \ErrorException('xml file not found:'.$file);
         }
         $xml = simplexml_load_file($file);
         if (empty($xml)){
@@ -59,15 +80,20 @@ class XML2CenterConfig {
         
         $centerConfig->LogConfig = $logConfig;
         $centerConfig->monitorConfig = $monitorConfig;
-        $app = $xml->attributes();
-        $centerConfig->centerIp = self::getIp((string)$app->centerIp);
-        $centerConfig->centerPort = (int)$app->centerPort;
-        $centerConfig->configVersion = (string)$app->version;
+        $rootAttrs = $xml->attributes();
+        $centerConfig->centerIp = self::getIp((string)$rootAttrs->centerIp);
+        $centerConfig->centerPort = (int)$rootAttrs->centerPort;
+        $centerConfig->configVersion = (string)$rootAttrs->version;
         if(empty($centerConfig->centerIp) || empty($centerConfig->centerPort) || empty($centerConfig->configVersion)){
             throw new \ErrorException('centerIp,centerPort,configVersion not setted');
         }
         self::fillRewrite($xml,$centerConfig);
-        $templetes = self::getTemplates($xml);
+        $tplFile = (string)$rootAttrs->node_templates;
+        if(!empty($tplFile)){
+            $templetes = self::getTemplatesFromFile($tplFile);
+        }else{
+            $templetes = self::getTemplates($xml);
+        }
 
         $centerConfig->serviceMap[-1]=array();
         $centerConfig->serviceMapDeactive=array();
@@ -78,19 +104,19 @@ class XML2CenterConfig {
             throw new \ErrorException('xmlnode:server in servers is missing');
         }
         //根据定义，确认所有的实例的配置以及对应的路由
-        $servipUsed=array();
+        $centerConfig->proxyActive=array();
         foreach( $xml->servers->children() as $serv){
             $ip = self::getIp((string)$serv->attributes()->ip);
-            if(isset($servipUsed[$ip])){
+            if(isset($centerConfig->proxyActive[$ip])){
                 throw new \ErrorException('xmlnode:server\'s ip duplicate');
             }else{
+                $centerConfig->proxyActive[$ip] = (int)$serv->attributes()->proxyport;
                 self::fillOneProxyConfig($serv,$centerConfig,$templetes);
             }
         }
         $centerConfig->setServiceMap($centerConfig->serviceMap[-1]);
         unset($centerConfig->serviceMap[-1]);
 
-        
         return $centerConfig;
     }
     /**
@@ -109,6 +135,10 @@ class XML2CenterConfig {
             $attr = $nd->attributes();
             $tpl = (string)$attr->templateId;
             $name = (string)$attr->name;
+            $routeFlg = (string)$attr->route;
+            if(empty($routeFlg)){
+                $routeFlg = 'default';
+            }
             $newPort = (int)$attr->port;
             $newRoot = rtrim((string)$attr->dir,'/');
             $active = (string)$attr->active;
@@ -142,12 +172,12 @@ class XML2CenterConfig {
             //todo: 激活的service记录在-1里，剩下的放在-2里
             if($active=='yes'){
                 foreach ($defined['services'] as $serviceModule){
-                    $centerConfig->serviceMap[-1][$serviceModule][]=array('ip'=>$tmpConf->myIp,'port'=>$newPort);
+                    $centerConfig->serviceMap[-1][$serviceModule][$routeFlg][]=array('ip'=>$tmpConf->myIp,'port'=>$newPort);
                     $centerConfig->serviceInNode[$serviceModule][]=$name;
                 }
             }else{
                 foreach ($defined['services'] as $serviceModule){
-                    $centerConfig->serviceMapDeactive[$serviceModule][]=array('ip'=>$tmpConf->myIp,'port'=>$newPort);
+                    $centerConfig->serviceMapDeactive[$serviceModule][$routeFlg][]=array('ip'=>$tmpConf->myIp,'port'=>$newPort);
                     $centerConfig->serviceInNode[$serviceModule][]=$name;
                 }
             }
@@ -156,6 +186,8 @@ class XML2CenterConfig {
                 'start'=> str_replace('{dir}', $newRoot, $defined['cmd_start']),
                 'stop'=>str_replace('{dir}', $newRoot, $defined['cmd_stop']),
                 'ping'=>str_replace('{dir}', $newRoot, $defined['cmd_ping']),
+                'reload'=>str_replace('{dir}', $newRoot, $defined['cmd_reload']),
+                'patch'=>str_replace('{dir}', $newRoot, $defined['cmd_patch']),
                 'active'=>$active,
                 '_port_'=>$newPort,
             );
@@ -188,6 +220,17 @@ class XML2CenterConfig {
 
         $centerConfig->setRewrite($newRewrite);
     }
+    protected static function getTemplatesFromFile($file)
+    {
+        if (!is_file($file)){
+            throw new \ErrorException('xml file not found:'.$file);
+        }
+        $xml = simplexml_load_file($file);
+        if (empty($xml)){
+            throw new \ErrorException('not xml file');
+        }
+        return self::getTemplates($xml);
+    }
     protected static function getTemplates($xml)
     {
         $templetes = array();
@@ -205,6 +248,8 @@ class XML2CenterConfig {
                 'cmd_start' => (string)$tpl->cmds->start->attributes()->cmd,
                 'cmd_stop' => (string)$tpl->cmds->stop->attributes()->cmd,
                 'cmd_ping' => (string)$tpl->cmds->ping->attributes()->cmd,
+                'cmd_reload' => (string)$tpl->cmds->reload->attributes()->cmd,
+                'cmd_patch' => (string)$tpl->cmds->patch->attributes()->cmd,
             );
             if(empty($templetes[$id]['defaultRoot']) || empty($templetes[$id]['defaultPort'])){
                 throw new \ErrorException('templete '.$id.' missing root-dir or port');

@@ -7,31 +7,71 @@ namespace SingleService;
  * @author wangning
  */
 class AsyncTaskDispather {
-    public function __construct($config,$loger) {
+    public function __construct($config,$loger,$reqRunning=-1,$taskRunning=-1) {
         $this->_Config = $config;
         $this->_log=$loger;
+        $this->_reqRunning = $reqRunning;
+        $this->_taskRunning = $taskRunning;
     }
     /**
-     *
+     * 当前请求数（参考用）
+     */
+    protected $_reqRunning=0;
+    /**
+     * 当前swoole-task任务数（参考用）
+     */
+    protected $_taskRunning=0;
+    /**
+     * 记录日志用的
      * @var \SingleService\Loger 
      */
     protected $_log;
     /**
-     *
+     * 获取配置用的
+     * 获取当前模块专属配置可以使用 getModuleConfigItem()
      * @var \Sooh\Ini 
      */
     protected $_Config;
+    
     /**
-     * 
+     * swoole 启动时通过curl内部命令方式触发该函数，做一些默认操作，慎改
+     */
+    public function internalCmd_start($SingleServer,$swooleRequest)
+    {
+        $this->onServerStart($Server, $swooleRequest);
+        $timerMS = $this->getModuleConfigItem('Timer_Interval_MS');
+        if($timerMS!=0){
+            swoole_timer_tick(abs($timerMS), function ($timer_id, $tickCounter) use ($Server) 
+            {
+                error_log('[internal onTimer] counter='.$tickCounter);
+                if($this->getModuleConfigItem('Timer_Interval_MS')<=0){
+                    return;
+                }
+                if($this->_Config->permanent->gets('shuttingDown')===true){
+                    return;
+                }
+                $this->onTimer($Server,$tickCounter);
+            },null);
+        }
+    }
+
+    
+    /**
+     * server启动时触发一次
      * @param Server $SingleServer
      * @param swoole\request ,$swooleRequest
      */
-    public function onServerStart($SingleServer,$swooleRequest)
+    protected function onServerStart($SingleServer,$swooleRequest)
     {
         $this->_log->app_trace('server start');
         //$this->startTimer($swoole);
     }
-    
+    /**
+     * 定时任务， $server 传进来是 createSwooleTask 用的
+     */
+    protected function onTimer($Server,$tickCounter)
+    {
+    }
 //    protected function startTimer($swoole)
 //    {
 //

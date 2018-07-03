@@ -41,11 +41,11 @@ class Plugin {
         return $obj;
     }
     
-    protected function returnOK($msg=null)
+    protected function setReturnOK($msg=null)
     {
         $this->_view->setResult(\SingleService\Ret::factoryOk($msg));
         }
-    protected function returnError($msg,$code=null)
+    protected function setReturnError($msg,$code=null)
     {
         $this->_view->setResult(\SingleService\Ret::factoryError($msg,$code));
     }    

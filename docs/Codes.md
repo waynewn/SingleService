@@ -26,7 +26,7 @@
             {
                 $msgtpl = $this->_Config->getIni('Msg.HelloWorld.zhcn');
 
-                $this->returnOK(sprintf($msgtpl,$this->_request->get('name')));
+                $this->setReturnOK(sprintf($msgtpl,$this->_request->get('name')));
             }
         }
 
@@ -68,7 +68,7 @@ request，view等用法，参见：[框架说明](docs/Framework.md)
 		class MissingController extends \SingleService\ServiceController{
 		    public function checkBeforeAction()
 		    {
-				$this->returnError('Missing',404);
+				$this->setReturnError('Missing',404);
 				return false;
 		    }
 		}
@@ -90,7 +90,7 @@ request，view等用法，参见：[框架说明](docs/Framework.md)
                     return true;
                 }else{
                     $this->_view->assign('loginUrl','....');
-                    $this->returnError('need login',401);
+                    $this->setReturnError('need login',401);
                     return false;
                 }
             }

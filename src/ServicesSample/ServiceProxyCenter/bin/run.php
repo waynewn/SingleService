@@ -1,11 +1,6 @@
 <?php
-//加载自己的autoload
-//if(is_readable('autoload.php')){
-    //注意，默认的模板文件里需要指定两个路径，一个是Sooh2的，一个是公司类库的
-//    include 'autoload.php';
-//}
-define ('SoohServicePorxyUsed','ServicePorxy');//如果工作与 Sooh-ServicePorxy 环境，这里指出对应配置的模块名
-require '../../autoload.php';//如果autoload里没有相关路由自动加载，include这个
+define ('SoohServiceProxyUsed','ServiceProxy');//如果工作与 Sooh-ServiceProxy 环境，这里指出对应配置的名称
+require '/root/vendor/autoload.php';//如果autoload里没有相关路由自动加载，include这个
 //usage: 
 //php run.php HelloWorld $1 $2 'http://127.0.0.1:9002/ini/broker/getini?name='
 //      0         1       2  3   4
@@ -14,7 +9,7 @@ if($argc!=5){
 }
 
 $sys = \SingleService\Server::factory()
-        ->initServiceModule(dirname(dirname(__DIR__)),$argv[1]) //本次启动的是哪个微服务
+        ->initServiceModule(dirname(dirname(__DIR__)),$argv[1]) //本次启动的是哪个微服务(包括路径)
         ->initLog(
                 \Sooh\Loger::getInstance()->setTraceLevel(7)
                     //->initFileTpl($basedir, $filenameWithSubDir)  // 可以使用变量：{year},{month},{day},{hour},{minute},{second},{type}

@@ -12,7 +12,7 @@
 - 参数会把异常、task函数名、data参数一并传入
 - swoole的回调函数需要有返回值才能触发，所以如果有等待的回调，这里酌情考虑是否要有返回值
 
-**server启动时的一次性事件onServerStart($SingleServer)**
+**server启动时的一次性事件onServerStart($SingleServer,$request)**
 
 - 参数$SingleServer是\SingleService\Server；
 - 一般这里用于启动一个定时器（swoole_timer_tick函数说明参看swoole官方手册）
@@ -21,6 +21,10 @@
                 $finished=0;
                 $SingleServer->createSwooleTask('doOneJob', 参数);
         },null);
+
+**定时任务 onTimer(server,tickCount)**
+
+定时任务， $server 传进来是 createSwooleTask 用的 
 
 **执行task之前调用doBeforeTask($func,$data)**
 

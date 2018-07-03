@@ -1,22 +1,24 @@
 <?xml version='1.0' encoding="utf-8"?>
 <application >
 	<node_templates>
-		<template id="DataStatusTpl" port="8007"        dir="/root/ServiceProxy/src/Services/DataStatus" comment="部署的路径，用于替换命令定义中{dir}">
-			<cmds><stop cmd="{dir}/stop.sh" /><start cmd="{dir}/start.sh"/><ping cmd="{dir}/ping.sh" /></cmds>
-			<serivices><module name='DataStatus'/></serivices>
-		</template>
-		<template id="helloTpl" port="8010"           dir="/root/ServiceProxy/src/Services/HelloWorld" comment="部署的路径，用于替换命令定义中{dir}">
-			<cmds><stop cmd="{dir}/stop.sh"/><start cmd="{dir}/start.sh"/><ping cmd="{dir}/cmd.sh"/></cmds>
+		<template id="iniServTpl" port="9003"         dir="/root/vendor/steady-as-hill/single-service-server/src/ServicesSample/Ini" comment="部署的路径，用于替换命令定义中{dir}">
+			<cmds><stop cmd="{dir}/bin/stop.sh" /><start cmd="{dir}/bin/start.sh"/><ping cmd="{dir}/bin/ping.sh" /><reload cmd="{dir}/bin/reload" /><patch cmd="{dir}/bin/patch.sh" /></cmds>
+			<serivices><module name='ini'/></serivices>
+		</template>            
+		<template id="helloTpl" port="8999"           dir="/root/vendor/steady-as-hill/single-service-server/src/ServicesSample/HelloWorld" comment="部署的路径，用于替换命令定义中{dir}">
+			<cmds><stop cmd="{dir}/bin/stop.sh" /><start cmd="{dir}/bin/start.sh"/><ping cmd="{dir}/bin/ping.sh" /><reload cmd="{dir}/bin/reload" /><patch cmd="{dir}/bin/patch.sh" /></cmds>
 			<serivices><module name='hello' /></serivices>
 		</template>
+                
+		<template id="DataStatusTpl" port="8007"        dir="/root/ServiceProxy/src/Services/DataStatus" comment="部署的路径，用于替换命令定义中{dir}">
+			<cmds><stop cmd="{dir}/bin/stop.sh" /><start cmd="{dir}/bin/start.sh"/><ping cmd="{dir}/bin/ping.sh" /><reload cmd="{dir}/bin/reload" /><patch cmd="{dir}/bin/patch.sh" /></cmds>
+			<serivices><module name='DataStatus'/></serivices>
+		</template>                
 		<template id="mailServTpl" port="8008"        dir="/root/ServiceProxy/src/Services/Email" comment="部署的路径，用于替换命令定义中{dir}">
-			<cmds><stop cmd="{dir}/stop.sh" /><start cmd="{dir}/start.sh"/><ping cmd="{dir}/ping.sh" /></cmds>
+			<cmds><stop cmd="{dir}/bin/stop.sh" /><start cmd="{dir}/bin/start.sh"/><ping cmd="{dir}/bin/ping.sh" /><reload cmd="{dir}/bin/reload" /><patch cmd="{dir}/bin/patch.sh" /></cmds>
 			<serivices><module name='MailService'/></serivices>
 		</template>
-		<template id="iniServTpl" port="8009"         dir="/root/ServiceProxy/src/Services/Ini" comment="部署的路径，用于替换命令定义中{dir}">
-			<cmds><stop cmd="{dir}/stop.sh" /><start cmd="{dir}/start.sh"/><ping cmd="{dir}/ping.sh" /></cmds>
-			<serivices><module name='ini'/></serivices>
-		</template>                
+                
 	</node_templates>
 
 </application>

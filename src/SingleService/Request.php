@@ -50,14 +50,14 @@ class Request {
     {
         return $this->_params['__MdL__'];
     }
-    public function getCookie($key)
+    public function getCookie($key=null)
     {
         if($key!=null){
-        if(isset($this->_req->cookie[$key])){
-            return $this->_req->cookie[$key];
-        }else{
-            return null;
-        }
+            if(isset($this->_req->cookie[$key])){
+                return $this->_req->cookie[$key];
+            }else{
+                return null;
+            }
         }else{
             return $this->_req->cookie;
         }

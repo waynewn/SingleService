@@ -6,6 +6,19 @@ namespace Sooh\ServiceProxy\Config;
  * @author wangning
  */
 class CenterConfig {
+    /**
+     * 
+     * @return \Sooh\ServiceProxy\Config\CenterConfig
+     */
+    public static function getInstance($config)
+    {
+        return $config->permanent->gets('centerConfig');
+    }
+    public static function setInstance($config, $centerConfig)
+    {
+        $config->permanent->sets('centerConfig',$centerConfig);
+    }
+    
     public $envIni=array();
     /**
      *
@@ -57,6 +70,7 @@ class CenterConfig {
      * @var array (proxyIp=> configobj-string )
      */
     public $proxy=array();
+    public $proxyActive=array();
     /**
      * 
      * @param CenterConfig $newobj
@@ -77,6 +91,7 @@ class CenterConfig {
         $this->nodeLocation = $newobj->nodeLocation;
         $this->serviceMapDeactive = $newobj->serviceMapDeactive;
         $this->proxy = $newobj->proxy;
+        $this->proxyActive = $newobj->proxyActive;
     }
     public function setRewrite($rewrite)
     {

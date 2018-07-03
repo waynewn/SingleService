@@ -48,14 +48,18 @@ class Server
         try{
             if($permanentDriver==null){
                 $permanentDriver = new \Sooh\IniClasses\Vars();
+                //$permanentDriver = new \SingleService\IniPermanent();
             }
             if(substr($dirOrUrl,0,5)=='http:'){
                 $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Url($dirOrUrl,$this->ServiceModuleName), $permanentDriver);
             }else{
                 $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Files(realpath($dirOrUrl),$this->ServiceModuleName), $permanentDriver);
             }
-
-            $this->serviceNameInUri = explode(',',$this->config->getIni($this->ServiceModuleName.'.SERVICE_MODULE_NAME'));
+            $tmp = $this->config->getIni($this->ServiceModuleName);
+            if(empty($tmp)){
+                die('get ini for '.$this->ServiceModuleName.' from '.$dirOrUrl.' failed');
+            }
+            $this->serviceNameInUri = explode(',',$tmp['SERVICE_MODULE_NAME']);
         }catch(\ErrorException $ex){
             die($ex->getMessage());
         }
@@ -110,7 +114,6 @@ class Server
         }
         $cmpFilename = implode('/', $tmp).'.php';
         
-        //error_log(">>>>>autoload:>>>>>>>>>$cmp>>>>>>".$f);
         if(is_file($this->_includePath.'/'.$cmpFilename)){
             include $this->_includePath.'/'.$cmpFilename;
             return true;
@@ -306,7 +309,7 @@ class Server
         switch ($cmd){
             case 'onServerStart':
                 $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
-                $tmp->onServerStart($this,$request);
+                $tmp->internalCmd_start($this,$request);
 
                 $response->header("Content-Type", "application/json");
                 $response->end(Ret::factoryOk($this->ServiceModuleName.' first called')->toJsonString());
@@ -314,6 +317,7 @@ class Server
             case 'shutdownThisNode':
                 $response->header("Content-Type", "application/json");
                 $response->end(Ret::factoryOk($this->ServiceModuleName.' shutting down')->toJsonString());
+                $this->config->permanent->sets('shuttingDown',true);
                 $this->swoole->shutdown();
                 return;
             case 'getNumProcessRunning':
@@ -393,7 +397,8 @@ class Server
     }
     public function dispatch($request, $response)
     {
-        if(defined('SoohServicePorxyUsed')){
+        $this->config->onNewRequest();
+        if(defined('SoohServiceProxyUsed')){
             try{
                 \Sooh\Curl::getInstance($cookieAddons=\Sooh\CurlClasses\CookiesForServiceProxy::factoryByStipulated($request->cookie));
                 $requestSN = $cookieAddons->getRequestSN();
@@ -412,6 +417,7 @@ class Server
         }else{
             $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'],$requestSN);
         }
+        $this->log->initMoreInfo('Port',$request->server['server_port']);
         $this->config->setRuntime('CurServModName', $this->ServiceModuleName);
         $this->log->app_trace('['.$request->server['remote_addr'].']'.$request->server['request_uri']);
         if($this->wwwroot!==null){
@@ -452,7 +458,7 @@ class Server
         }
 
         if(!in_array($mca[1], $this->serviceNameInUri)){
-            $this->log->app_common("EXEC ". implode('/', $mca). " 403 invalid-service-name" );
+            $this->log->app_common("EXEC ". implode('/', $mca). " 403 invalid-service-name, should be (". implode(',', $this->serviceNameInUri).")" );
             $response->status(404);
             $response->end();
             $this->reqRunning->sub(1);
@@ -540,7 +546,6 @@ class Server
     protected $arrIpPort=array();
     protected function startSwoole($ipListen,$portListen,$workerNum,$taskNum)
     {
-        error_log($this->ServiceModuleName.' '.__FUNCTION__."($ipListen,$portListen,$workerNum,$taskNum)");
         $this->arrIpPort=array($ipListen,$portListen);
         $this->checkTaskSetting($taskNum);
         $http = new \swoole_http_server($ipListen,$portListen);
@@ -562,7 +567,6 @@ class Server
     
     protected function checkTaskSetting($taskNum)
     {
-        error_log(__FUNCTION__.'----'. var_export($this->config->dump(),true));
         if($taskNum>0){
             if(!is_file($this->baseDir.'/AsyncTaskDispatcher.php')){
                 die('MISSING '.$this->baseDir.'/AsyncTaskDispatcher.php');
@@ -604,22 +608,20 @@ class Server
     }
     public function onSwooleStart($server)
     {
-        error_log(__FUNCTION__.'----'. var_export($this->config->dump(),true));
         if(class_exists('\\AsyncTaskDispatcher',false)){
-            error_log('ignore timeout error of: Operation timed out after 1000 milliseconds with 0 bytes received http://...../onServerStart');
-            $ret = \Sooh\Curl::factory()->httpGet('http://127.0.0.1:'.$this->arrIpPort[1].'/SteadyAsHill/broker/onServerStart',null,null,1);
+            error_log('ignore timeout error of: Operation timed out after 1000 milliseconds with 0 bytes received http://127.0.0.1:'.$this->arrIpPort[1].'/SteadyAsHill/broker/onServerStart');
+            $ret = \Sooh\Curl::getInstance()->httpGet('http://127.0.0.1:'.$this->arrIpPort[1].'/SteadyAsHill/broker/onServerStart',null,1);
         }
     }
     public function onSwooleTask($serv, $task_id, $src_worker_id, $data)
     {
-        //error_log("## server:onTaskStart:enter". json_encode($data));
         $this->taskRunning->add(1);
         \Sooh\Curl::getInstance([]);
         $func = $data[0];
 
         $this->log->initOnNewRequest('///'.$func,'0.0.0.0',$data[2]);
         $this->config->setRuntime('CurServModName', $this->ServiceModuleName);
-        $tmp = new \AsyncTaskDispatcher($this->config,$this->log);
+        $tmp = new \AsyncTaskDispatcher($this->config,$this->log,$this->reqRunning->get(),$this->taskRunning->get());
 
         $this->log->app_trace("task-process-info:task_id=$task_id, src_worker_id=$src_worker_id");
         try{

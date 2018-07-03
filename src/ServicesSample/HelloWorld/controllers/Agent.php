@@ -9,7 +9,7 @@ class AgentController extends \SingleService\ServiceController{
     {
         $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
         $this->_view->assign("cookies", $this->_request->getCookie());
-        $this->returnOK('hi,'.$this->_request->get('name'));
+        $this->setReturnOK('hi,'.$this->_request->get('name'));
 
     }
     
@@ -18,7 +18,7 @@ class AgentController extends \SingleService\ServiceController{
         $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
         $this->_serverOfThisSingleService->createSwooleTask(array('taskFrom'=>'broker','seq'=>1), array($this,'onSwooleTaskStart1'), array($this,'onSwooleTaskEnd1'));
 
-        $this->returnOK('run background and return accept');
+        $this->setReturnOK('run background and return accept');
     }
     
     public function proxyAction()
@@ -26,8 +26,8 @@ class AgentController extends \SingleService\ServiceController{
         $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
         $serviceProxy = $this->_Config->getIni('ServiceProxy.LocalProxyIPPort');
         $ret = \Sooh\Curl::getInstance()->httpGet($serviceProxy."/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/agent/sayhi?name='. urlencode($this->_request->get('name')));
-        $this->_view->assign('proxy_result', $ret);
-        $this->returnOK("proxy done");
+        $this->_view->assign('proxy_result', $ret->body);
+        $this->setReturnOK("proxy done");
     }
     
     public function proxy2Action()
@@ -36,15 +36,15 @@ class AgentController extends \SingleService\ServiceController{
         $serviceProxy = $this->_Config->getIni('ServiceProxy.LocalProxyIPPort');
         $baseUri = $serviceProxy."/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/agent/';
         $paramPart = '?name='. urlencode($this->_request->get('name'));
-        $this->_view->assign('proxy_result', \Sooh\Curl::getInstance()->httpGet($baseUri.'/sayhi'.$paramPart));
-        $this->_view->assign('proxy_result2', \Sooh\Curl::getInstance()->httpGet($baseUri.'/proxy'.$paramPart));
-        $this->returnOK("proxy done");
+        $this->_view->assign('proxy_result', \Sooh\Curl::getInstance()->httpGet($baseUri.'/sayhi'.$paramPart)->body);
+        $this->_view->assign('proxy_result2', \Sooh\Curl::getInstance()->httpGet($baseUri.'/proxy'.$paramPart)->body);
+        $this->setReturnOK("proxy done");
     }
     
     public function getUsrSettingAction()
     {
         $this->_view->assign('forServiceProxy', array('UID'=>$this->_request->get('sessionId'),'ROUTE'=>'default'));
-        $this->returnOK("proxy done");
+        $this->setReturnOK("proxy done");
     }
     
     public function flgAction()
@@ -54,7 +54,7 @@ class AgentController extends \SingleService\ServiceController{
 //        $o->setField('uid',123);
 //        $ret = $o->saveToDB();
 //        $this->_view->assign('ret', $ret);
-//        $this->returnOK('Msg.common.server_busy');
+//        $this->setReturnOK('Msg.common.server_busy');
 //        $this->_view->assign('extendInfo', array('flgA'=>time().'#'.$this->_request->get('flg').'@u:'.$this->_request->get('uid')));
     }
 
