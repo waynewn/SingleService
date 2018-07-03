@@ -47,8 +47,8 @@ class Server
         }
         try{
             if($permanentDriver==null){
-                $permanentDriver = new \Sooh\IniClasses\Vars();
-                //$permanentDriver = new \SingleService\IniPermanent();
+                //$permanentDriver = new \Sooh\IniClasses\Vars();
+                $permanentDriver = new \SingleService\IniPermanent();
             }
             if(substr($dirOrUrl,0,5)=='http:'){
                 $this->config = \Sooh\Ini::getInstance()->initLoader(new \Sooh\IniClasses\Url($dirOrUrl,$this->ServiceModuleName), $permanentDriver);

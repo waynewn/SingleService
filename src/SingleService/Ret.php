@@ -13,6 +13,11 @@ class Ret {
         $this->msg = $msg;
     }
     
+    public static function getSuccessCode()
+    {
+        return self::$preDefined[1];
+    }
+    
     public function isOk()
     {
         return $this->code == self::$preDefined[1];

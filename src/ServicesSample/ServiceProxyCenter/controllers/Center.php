@@ -101,7 +101,7 @@ class CenterController extends \CenterBase{
         $centerConfig= $this->getCenterConfig();
         $clients = \SingleService\Coroutione\Clients::create(5);
         $ret = array('time_start'=>date('m-d H:i:s',$this->_request->getServerHeader('request_time')),'time_end'=>'');
-        foreach($this->config->proxy as $proxyStr)
+        foreach($centerConfig->proxy as $proxyStr)
         {
             $tmp = \Sooh\ServiceProxy\Config\XML2CenterConfig::getProxyConfigObjFromStr($proxyStr,$centerConfig);
             $str  = json_encode(array(
@@ -125,8 +125,9 @@ class CenterController extends \CenterBase{
      * 临时关闭某(些)节点,并广播到各个proxy (这里没考虑两个管理员同时操作，一个关闭一个开启，会冲突)
      * 参数： nodes： 逗号分割的节点名称
      */
-    protected function nodeDeactiveAction()
+    public function nodeDeactiveAction()
     {
+        $centerConfig = $this->getCenterConfig();
         $nodes0 = $this->_request->get('nodes');
         $this->writeCmdLog(array('nodes'=>$nodes0));
         if(empty($nodes0)){
@@ -135,14 +136,13 @@ class CenterController extends \CenterBase{
         $nodes = explode(',',$nodes0);
         $nodeIpPort = array();
         foreach($nodes as $nd){
-            if(isset($this->config->nodeLocation[$nd])){
-                $r = $this->config->nodeLocation[$nd];
+            if(isset($centerConfig->nodeLocation[$nd])){
+                $r = $centerConfig->nodeLocation[$nd];
                 $nodeIpPort[$r['ip'].':'.$r['port']] = $r;
             }else{
                 return $this->setReturnError('node '.$nd.' not found');
             }
         }
-        $centerConfig = $this->getCenterConfig();
         $oldServiceMap = $centerConfig->getServiceMap();
         
         foreach($oldServiceMap as $serviceName=>$byType){
@@ -151,7 +151,7 @@ class CenterController extends \CenterBase{
                 foreach ($rs as $r){
                     $s = $r['ip'].':'.$r['port'];
                     if(isset($nodeIpPort[$s])){
-                        $this->config->serviceMapDeactive[$serviceName][$routeType][]=$r;
+                        $centerConfig->serviceMapDeactive[$serviceName][$routeType][]=$r;
                     }else{
                         $tmp[$routeType][]=$r;
                     }
@@ -206,121 +206,76 @@ class CenterController extends \CenterBase{
     /**
      * 获取proxy当前状态
      */
-    protected function proxisStatusAction()
+    public function proxisStatusAction()
     {
-        
-        $timeNow = $this->getRequestTime();
-        $minuteThis = date('m-d H:i',$timeNow);
-        $minutePre= date('m-d H:i',$timeNow-60);
+        $centerConfig = $this->getCenterConfig();
         $ips = $this->_request->get('ips');
         $this->writeCmdLog(array('ips'=>$ips));
         try{
             if(empty($ips)){
-                $r = array_keys($this->config->proxy);
+                $r = array_keys($centerConfig->proxy);
             }else{
                 $r = explode(',', $ips);
                 foreach($r as $k=>$v){
-                    $r[$k]=Funcs::getIp($v);
+                    $r[$k]= \Sooh\ServiceProxy\Config\XML2CenterConfig::getIp($v);
                 }
             }
             $ret = $this->getProxiesStatus($r, 1);
-            $finalRet=array();
-            //$this->log->trace("minuteThis=>$minuteThis,minutePre=>$minutePre");
-            foreach($ret as $k=>$r){
-                $pos = strpos($k, '/',8);
-                $k2 = substr($k, 7,$pos-7);
-                $finalRet[$k2]=$r;
-                
-                foreach($finalRet[$k2]['proxy']['counter'] as $timestamp=>$r)
-                {
-                    if($timestamp==$minutePre || $timestamp==$minuteThis){
-                        $finalRet[$k2]['proxy']['counter'][$timestamp] = array_sum($r);
-                    }else{
-                        unset($finalRet[$k2]['proxy']['counter'][$timestamp]);
-                    }
-                }
-                unset($finalRet[$k2]['proxyip']);
-                unset($finalRet[$k2]['request_time']);
-            }
             
-            $this->returnJsonResponse($response, array('code'=>200,'proxiesStatus'=>$finalRet));
+            $this->_view->assign('proxiesStatus', $ret);
+            $this->setReturnOK();
         }catch(\ErrorException $ex){
-            $this->returnJsonResponse($response, array('code'=>400,'msg'=>$ex->getMessage()));
+            $this->setReturnError("error:".$ex->getMessage());
         }
     }
-    
-    protected function proxisCounterAction()
+    /**
+     * 获取当前代理情况
+     * 
+     * 返回：
+     * {
+     *      current_tasks{
+     *          proxy1_ip => {
+     *                   node1_name => num
+     *                   ... ...
+     *          },
+     *          ... ...
+     *      }
+     * }
+     */
+    public function currentAction()
     {
-        $timeNow = $this->getRequestTime();
-        $minuteThis = date('m-d H:i',$timeNow);
-        $minutePre= date('m-d H:i',$timeNow-60);
-        //$this->log->trace("minuteThis=>$minuteThis,minutePre=>$minutePre");        
-        try{
-            $r = array_keys($this->config->proxy);
-            $ret = $this->getProxiesStatus($r, 1);
-            $finalRet=array();
-
-            foreach($ret as $k=>$r){
-                $pos = strpos($k, '/',8);
-                $k2 = substr($k, 7,$pos-7);
-                $finalRet[$k2]=$r;
-                
-                foreach($finalRet[$k2]['proxy']['counter'] as $timestamp=>$r)
-                {
-                    if($timestamp==$minutePre || $timestamp==$minuteThis){
-                        $finalRet[$timestamp][$k2] = array_sum($r);
-                    }
-                }
-            }
-            
-            $this->returnJsonResponse($response, array('code'=>200,'proxiesCounter'=>$finalRet));
-        }catch(\ErrorException $ex){
-            $this->returnJsonResponse($response, array('code'=>400,'msg'=>$ex->getMessage()));
+        $rpt = new \Sooh\ServiceProxy\Struct\ProxyReportedStatus();
+        $nodename = $this->_request->get('nodename');
+        $proxyip = $this->_request->get('proxyip');
+        $this->writeCmdLog(array('proxyip'=>$proxyip,'nodename'=>$nodename));
+        $centerConfig = $this->getCenterConfig();
+        $nodeNameMap = array();
+        foreach($centerConfig->nodeLocation as $nm=>$r){
+            $nodeNameMap[$r['ip'].':'.$r['port']]=$nm;
         }
-    }
-    
-    protected function routeSummaryAction()
-    {
-        $namelike = $this->getReq($request, 'namelike');
-        $map = array();
-        if(empty($namelike)){
-            foreach($this->config->nodeLocation as $name=>$ipPort){
-                $map[$ipPort['ip'].':'.$ipPort['port']] = $name;
-            }
+        if(empty($proxyip)){
+            $proxyipList = array_keys($centerConfig->proxyActive);
         }else{
-            foreach($this->config->nodeLocation as $name=>$ipPort){
-                if(strpos($name, $namelike)!==false){
-                    $map[$ipPort['ip'].':'.$ipPort['port']] = $name;
+            $proxyipList = array($proxyip);
+        }
+        $ret = array();
+        $rpts = $this->getProxiesStatus($proxyipList,true);
+        foreach($rpts as $rpt){
+            foreach ($rpt->CurrentRequesting as $nodeIpPort=>$num){
+                if($num<=0){
+                    continue;
+                }
+                if(!empty($nodename)){
+                    if($nodename==$nodeNameMap[$nodeIpPort]){
+                        $ret[$rpt->ProxyIP][ $nodename ]=$num;
+                    }
+                }else{
+                    $ret[$rpt->ProxyIP][ $nodeNameMap[$nodeIpPort] ]=$num;//,'Detail'=>array()
                 }
             }
         }
-        $timeNow = $request->server['request_time'];
-        $minuteThis = date('m-d H:i',$timeNow);
-        $minutePre= date('m-d H:i',$timeNow-60);        
-        try{
-            $ret = $this->getProxiesStatus(array_keys($this->config->proxy), true);
-            $summary = array(); //格式 $summary[$timestamp][$ip]=$num;  
-            foreach ($ret as $r){
-                foreach($r['proxy']['counter'] as $timestamp=>$ip_num){
-                    if($timestamp!==$minutePre && $timestamp!==$minuteThis){
-                        continue;
-                    }
-                    foreach ($ip_num as $ip=>$num){
-                        if(isset($map[$ip])){
-                            $summary[$timestamp][ $map[$ip] ]+=$num;
-                        }
-                    }
-                }
-            }
-            ksort($summary);
-            if(empty($summary)){
-                $this->returnJsonResponse($response, array('code'=>200,'message'=>'routeSummary is empty'));
-            }else{
-                $this->returnJsonResponse($response, array('code'=>200,'routeSummary'=>$summary));
-            }
-        }catch(\ErrorException $ex){
-            $this->returnJsonResponse($response, array('code'=>400,'msg'=>$ex->getMessage()));
-        }
+        $this->_view->assign('current_tasks', $ret);
+        $this->setReturnOK();
     }
     
     /**
@@ -331,7 +286,7 @@ class CenterController extends \CenterBase{
      *  service:   包含指定服务的那些proxy
      * 返回
      * 	{
-     *      macthed_proxies{
+     *      macthed_position{
      * 		proxy1_ip:{
      * 			node1name=>port,
      * 			node2name=>port,
@@ -339,7 +294,7 @@ class CenterController extends \CenterBase{
      *      }
      * 	}
      */
-    public function findProxyAction()
+    public function findAction()
     {
         $limitNodeNameLike = $this->_request->get('nodename');
         $limitServiceNameLike = $this->_request->get('service');
@@ -371,7 +326,7 @@ class CenterController extends \CenterBase{
             }
         }
 
-        $this->_view->assign('macthed_proxies', $ret);
+        $this->_view->assign('macthed_position', $ret);
         $this->setReturnOK();
     }    
 }

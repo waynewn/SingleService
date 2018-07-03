@@ -195,12 +195,12 @@ class ProxyConfig {
             $this->rewriteRule[$newIndex]=$rewrite;
             $this->rewriteRuleIndex=$newIndex;
         }else{
-            \Sooh\ServiceProxy\Util\Funcs::emptySwooleTable($this->rewriteRule[$newIndex]);
-            
-            foreach($rewrite as $from=>$to){
-                $this->rewriteRule[$newIndex]->set($from,array('to'=>$to));
-            }
-            $this->rewriteRuleIndex->set('0',array('index'=>$newIndex));
+//            \Sooh\ServiceProxy\Util\Funcs::emptySwooleTable($this->rewriteRule[$newIndex]);
+//            
+//            foreach($rewrite as $from=>$to){
+//                $this->rewriteRule[$newIndex]->set($from,array('to'=>$to));
+//            }
+//            $this->rewriteRuleIndex->set('0',array('index'=>$newIndex));
         }
     }
     public function getRewrite($find=null)
@@ -240,13 +240,13 @@ class ProxyConfig {
             $this->serviceMap[$newIndex]=$map;
             $this->serviceMapIndex=$newIndex;
         }else{
-            $newIndex = ($this->serviceMapIndex->get('0','index')+1)%2;
-            \Sooh\ServiceProxy\Util\Funcs::emptySwooleTable($this->serviceMap[$newIndex]);
-            
-            foreach($map as $from=>$r){
-                $this->serviceMap[$newIndex]->set($from,array('list'=> json_encode($r)));
-            }
-            $this->serviceMapIndex->set('0',array('index'=>$newIndex));
+//            $newIndex = ($this->serviceMapIndex->get('0','index')+1)%2;
+//            \Sooh\ServiceProxy\Util\Funcs::emptySwooleTable($this->serviceMap[$newIndex]);
+//            
+//            foreach($map as $from=>$r){
+//                $this->serviceMap[$newIndex]->set($from,array('list'=> json_encode($r)));
+//            }
+//            $this->serviceMapIndex->set('0',array('index'=>$newIndex));
         }
     }
     public function getServiceMap($find=null)

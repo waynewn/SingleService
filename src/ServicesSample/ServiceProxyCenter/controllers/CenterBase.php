@@ -77,10 +77,20 @@ class CenterBase extends \SingleService\ServiceController{
         }
         
         $ret = $clients->getResultsAndFree();
+        $finalRet=array();
         foreach ($ret as $k=>$v){
-            $ret[$k] = json_decode($v,true);
+            $tmp = explode('/', $k);
+            $k = $tmp[2];
+            if($v[0]=='{'){
+                $tmp = json_decode($v);
+                $tmp->CurrentRequesting = json_decode(json_encode($tmp->CurrentRequesting),true);
+                $tmp->NodesStatus = json_decode(json_encode($tmp->NodesStatus),true);
+                $finalRet[$k] = $tmp;
+            }else{
+                $finalRet[$k] = $v;
+            }
         }
-        return $ret;
+        return $finalRet;
     }    
     
     public function checkBeforeAction() {
