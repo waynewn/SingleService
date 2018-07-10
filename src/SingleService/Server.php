@@ -123,7 +123,7 @@ class Server
         if($this->_view===null){
             $this->_view=new \SingleService\View;
         }
-        $this->config->setRuntime('SoohCurServModName', $this->ServiceModuleName);
+        $this->config->setMainModule($this->ServiceModuleName);
         $ConfigPermanent = $this->config->getini($this->ServiceModuleName.'.PermanentForConfig');
         if(!empty($ConfigPermanent)){
             $this->config->permanent = new $ConfigPermanent($this->config);
@@ -438,7 +438,7 @@ class Server
             $this->log->initOnNewRequest($request->server['request_uri'],$request->server['remote_addr'],$requestSN);
         }
         $this->log->initMoreInfo('Port',$request->server['server_port']);
-        $this->config->setRuntime('SoohCurServModName', $this->ServiceModuleName);
+        $this->config->setMainModule($this->ServiceModuleName);
         //$this->log->app_trace("[#-#- $requestSN from ".$request->server['remote_addr'].']'.$request->server['request_uri']);
         if($this->wwwroot!==null){
             $file = $this->dealwith_www($request->server['request_uri'], $response);
@@ -651,7 +651,7 @@ class Server
         $func = $data[0];
 
         $this->log->initOnNewRequest('///'.$func,'0.0.0.0',$data[2]);
-        $this->config->setRuntime('SoohCurServModName', $this->ServiceModuleName);
+        $this->config->setMainModule($this->ServiceModuleName);
         $tmp = new \AsyncTaskDispatcher($this->config,$this->log,$this->reqRunning->get(),$this->taskRunning->get());
 
         $this->log->app_trace("task-process-info:task_id=$task_id, src_worker_id=$src_worker_id");
