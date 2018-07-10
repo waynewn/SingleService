@@ -25,7 +25,7 @@ class AgentController extends \SingleService\ServiceController{
     {
         $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
         $serviceProxy = $this->_Config->getIni('ServiceProxy.LocalProxyIPPort');
-        $ret = \Sooh\Curl::getInstance()->httpGet($serviceProxy."/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/agent/sayhi?name='. urlencode($this->_request->get('name')));
+        $ret = \Sooh\Curl::getInstance()->httpGet($serviceProxy."/".$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/agent/sayhi?name='. urlencode($this->_request->get('name')));
         $this->_view->assign('proxy_result', $ret->body);
         $this->setReturnOK("proxy done");
     }
@@ -34,7 +34,7 @@ class AgentController extends \SingleService\ServiceController{
     {
         $this->_log->app_common(__CLASS__.'->'.__FUNCTION__.'() called');
         $serviceProxy = $this->_Config->getIni('ServiceProxy.LocalProxyIPPort');
-        $baseUri = $serviceProxy."/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/agent/';
+        $baseUri = $serviceProxy."/".$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/agent/';
         $paramPart = '?name='. urlencode($this->_request->get('name'));
         $this->_view->assign('proxy_result', \Sooh\Curl::getInstance()->httpGet($baseUri.'/sayhi'.$paramPart)->body);
         $this->_view->assign('proxy_result2', \Sooh\Curl::getInstance()->httpGet($baseUri.'/proxy'.$paramPart)->body);
@@ -49,6 +49,8 @@ class AgentController extends \SingleService\ServiceController{
     
     public function flgAction()
     {
+        $this->_view->assign('trace', $this->_request->getServerHeader());
+        $this->setReturnOK();
 //        $o = \Prj\Session::getCopy(array("SessionId"=>'asdfgdfhjh'));
 //        $o->load();
 //        $o->setField('uid',123);

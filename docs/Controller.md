@@ -53,20 +53,11 @@ createSwooleTask($taskName,$taskData,$funcCallback);
 
 创建执行一个异步任务，taskname是AsyncTaskDispatcher里的函数名，data是会被当参数传入的，callback是回调函数
 
-关于异步任务，参看 [框架说明](docs/Framework.md)里关于AsyncTaskDispather的说明。
+关于异步任务，参看 [框架说明](docs/Framework.md)里关于AsyncTaskDispatcher的说明。
 
 
 
 ## 函数
-
-### 成员函数 getModuleConfigItem(subitem)
-
-提供了快捷方式获取模块专属配置，举例来说，对于HelloWorld模块，下面三种写法等价
-
-$this->_Config->getIni("HelloWorld.abc")
-$this->_Config->getIni($this->_Config->getRuntime('CurServModName').".abc")
-$this->getModuleConfigItem('abc')
-
 
 ### 成员函数 checkBeforeAction()
 

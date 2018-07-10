@@ -12,31 +12,45 @@ class CenterController extends \CenterBase{
             'nodecmd'=>$this->_request->get('cmd'),
         );
         $this->writeCmdLog($cmd);
-        $centerConfig = $this->getCenterConfig();
-        if(!isset($centerConfig->nodeLocation[$cmd['nodename']])){
-            $this->setReturnError('node with name:'.$cmd['nodename'].' not found', 404);
-        }else{
-            $proxyIp = $cmd['nodeip']= $centerConfig->nodeLocation[$cmd['nodename']]['ip'];
-            $cmd['nodeport']=$centerConfig->nodeLocation[$cmd['nodename']]['port'];
-            $proxyPort = $centerConfig->proxyActive[$proxyIp];
-        }
-        //$this->log->trace("============>$proxyIp:$proxyPort {$cmd['nodename']} {$cmd['nodecmd']}");
-        $clients = \SingleService\Coroutione\Clients::create(120);
-        $clients->addTask($proxyIp, $proxyPort, '/'.$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/nodecmd?'. http_build_query($cmd), null);
-        $this->_log->app_trace('send cmd: http://'.$proxyIp.':'.$proxyPort.'/'.$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/nodecmd?'. http_build_query($cmd));
-        $ret0 = current($clients->getResultsAndFree());
-        $ret = json_decode($ret0,true);
-        //todo: 根据命令，决定配置更新：启动停止
-
-        if(is_array($ret)){
-            foreach($ret as $k=>$v){
-                $this->_view->assign($k, $v);
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
+        $allNode = explode(',',$cmd['nodename']);
+        foreach($allNode as $nodename){
+            if(!isset($centerConfig->nodeLocation[$nodename])){
+                return $this->setReturnError('node with name:'.$nodename.' not found', 404);
             }
-            $this->setReturnOK();
-        }else{
-            $this->setReturnOK("cmd ret not received at ".date('H:i:s'));
         }
         
+        if(empty($cmd['nodecmd'])){
+            return $this->setReturnError('cmd not given', 404);
+        }
+        
+        $clients = \SingleService\Coroutione\Clients::create(120);
+        foreach($allNode as $nodename){
+            $cmd['nodename']=$nodename;
+            $proxyIp = $cmd['nodeip']= $centerConfig->nodeLocation[$nodename]['ip'];
+            $cmd['nodeport']=$centerConfig->nodeLocation[$nodename]['port'];
+            $proxyPort = $centerConfig->proxyActive[$proxyIp];
+            
+            $clients->addTask($proxyIp, $proxyPort, '/'.$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/nodecmd?'. http_build_query($cmd), null);
+            $this->_log->app_trace('send cmd: http://'.$proxyIp.':'.$proxyPort.'/'.$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/nodecmd?'. http_build_query($cmd));
+            
+        }
+        //$this->log->trace("============>$proxyIp:$proxyPort {$cmd['nodename']} {$cmd['nodecmd']}");
+        $nodenameMap = array();
+        foreach($centerConfig->nodeLocation as $nodename =>$r){
+            $nodenameMap[ $r['ip'].':'.$r['port'] ] =$nodename;
+        }
+        $finalRet = $clients->getResultObjAndFree(false,false);
+        
+        foreach ($finalRet as $uri=>$obj){
+            list($args,$tmp) = explode('?', $uri);
+            parse_str($tmp,$args);
+            $ipport = $args['nodeip'].':'.$args['nodeport'];
+            
+            $nodename = $nodenameMap[$ipport];
+            $this->_view->assign($nodename, $obj);
+        }
+        $this->setReturnOK();
     }
     /**
      * dump 当前的路由（节点）情况
@@ -44,7 +58,7 @@ class CenterController extends \CenterBase{
     public function dumpServiceMapAction()
     {
         $this->writeCmdLog(array());
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $this->_view->assign('serviceMap', $centerConfig->getServiceMap());
         $this->_view->assign('deactived', $centerConfig->serviceMapDeactive);
         $this->setReturnOK();
@@ -56,7 +70,7 @@ class CenterController extends \CenterBase{
     {
         $remoteAddr = $this->_request->getServerHeader('remote_addr');
         $this->writeCmdLog(array('proxyip'=>$remoteAddr));
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         if(empty($centerConfig)){
             $this->setReturnHttpCode(404);
             return;
@@ -79,18 +93,12 @@ class CenterController extends \CenterBase{
     {
         $this->writeCmdLog(array());
         try{
-            $tmp = \Sooh\ServiceProxy\Config\XML2CenterConfig::parse($this->_Config->permanent->gets('locationOfXML'));
-        }catch(\ErrorException $ex){
-            $tmp = null;
-        }
-        if(!empty($tmp)){
-            $centerConfig = $this->getCenterConfig();
-            $centerConfig->copyFrom($tmp);
-            $this->updCenterConfig($centerConfig);
+            $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::reload($this->_Config);
             $this->setReturnOK('new config version is: '.$centerConfig->configVersion);
-        }else{
-            $this->setReturnError(empty($ex)?"parse xml failed":$ex->getMessage());
+        }catch(\ErrorException $ex){
+             $this->setReturnError("error:".$ex->getMessage());
         }
+        
     }
     /**
      * 通知所有的proxy 节点更新配置
@@ -98,7 +106,7 @@ class CenterController extends \CenterBase{
     public function broadcastAction()
     {
         $this->writeCmdLog(array(),'broadcast');
-        $centerConfig= $this->getCenterConfig();
+        $centerConfig= \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $clients = \SingleService\Coroutione\Clients::create(5);
         $ret = array('time_start'=>date('m-d H:i:s',$this->_request->getServerHeader('request_time')),'time_end'=>'');
         foreach($centerConfig->proxy as $proxyStr)
@@ -109,10 +117,10 @@ class CenterController extends \CenterBase{
 //                'data'=>$tmp->toString(),
                 'json'=>$tmp->toString(true)
             ));
-            $clients->addTask($tmp->myIp, $tmp->myPort, '/'.$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/updateConfig', $str);
+            $clients->addTask($tmp->myIp, $tmp->myPort, '/'.$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/updateConfig', $str);
 
         }
-        $ret['result']=$clients->getResultsAndFree();
+        $ret['result']=$clients->getResultObjAndFree(false,true);
             
         $ret['time_end']= date('m-d H:i:s');
         foreach ($ret as $k=>$v){
@@ -127,7 +135,7 @@ class CenterController extends \CenterBase{
      */
     public function nodeDeactiveAction()
     {
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $nodes0 = $this->_request->get('nodes');
         $this->writeCmdLog(array('nodes'=>$nodes0));
         if(empty($nodes0)){
@@ -160,7 +168,7 @@ class CenterController extends \CenterBase{
             $oldServiceMap[$serviceName]=$tmp;
         }
         $centerConfig->setServiceMap($oldServiceMap);
-        $this->updCenterConfig($centerConfig);
+        \Sooh\ServiceProxy\Config\CenterConfig::setInstance($this->_Config, $centerConfig);
         $this->broadcastAction();
         $this->setReturnOK($nodes0.' deactived');
     }
@@ -177,7 +185,7 @@ class CenterController extends \CenterBase{
         }
         $nodes = explode(',',$nodes0);
         $nodeIpPort = array();
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         foreach($nodes as $nd){
             if(isset($centerConfig->nodeLocation[$nd])){
                 $r = $centerConfig->nodeLocation[$nd];
@@ -199,7 +207,7 @@ class CenterController extends \CenterBase{
             }
         }
         $centerConfig->setServiceMap($oldServiceMap);
-        $this->updCenterConfig($centerConfig);
+        \Sooh\ServiceProxy\Config\CenterConfig::setInstance($this->_Config, $centerConfig);
         $this->broadcastAction();
         $this->setReturnOK($nodes0.' reactived');
     }
@@ -208,7 +216,7 @@ class CenterController extends \CenterBase{
      */
     public function proxisStatusAction()
     {
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $ips = $this->_request->get('ips');
         $this->writeCmdLog(array('ips'=>$ips));
         try{
@@ -248,7 +256,7 @@ class CenterController extends \CenterBase{
         $nodename = $this->_request->get('nodename');
         $proxyip = $this->_request->get('proxyip');
         $this->writeCmdLog(array('proxyip'=>$proxyip,'nodename'=>$nodename));
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $nodeNameMap = array();
         foreach($centerConfig->nodeLocation as $nm=>$r){
             $nodeNameMap[$r['ip'].':'.$r['port']]=$nm;
@@ -301,7 +309,7 @@ class CenterController extends \CenterBase{
         $this->writeCmdLog(array('nodename'=>$limitNodeNameLike,'service'=>$limitServiceNameLike));
         
         $ret = array();
-        $centerConfig =$this->getCenterConfig();
+        $centerConfig =\Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         if(!empty($limitNodeNameLike)){
             foreach($centerConfig->nodeLocation as $nodeName=>$r){
                 if(false!== strpos($nodeName, $limitNodeNameLike)){

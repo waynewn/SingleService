@@ -112,7 +112,7 @@ ctrl里
 在项目目录下放置AsyncTaskDispatcher.php(注意方法名跟前面一致)
 
 		<?php
-		class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
+		class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispatcher{
 		    public function taskFuncName($data)
 		    {
 		        ...........
@@ -132,7 +132,7 @@ ctrl里
 
 <?php
 
-class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
+class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispatcher{
 
     public function onServerStart($SingleServer)
     {

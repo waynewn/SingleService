@@ -6,25 +6,17 @@ echo " e.g.: $0 127.0.0.1"
 exit 1; 
 fi 
 
+killall -9 php
+#   /root/vendor/steady-as-hill/SingleService/src/ServicesSample/ServiceProxyCenter/bin/start.sh 192.168.4.240 9001
+#   go run /root/go/src/github.com/waynewn/ServiceProxy/proxy.go 'http://192.168.4.240:9001/ServiceProxy/center/getProxyConfig?json=1'
+./ServicesSample/ServiceProxyCenter/bin/start.sh $1 9001
+sleep(1)
 echo ""
-./ServicesSample/Ini/bin/stop.sh $1 8009
-echo ""
-./ServicesSample/HelloWorld/bin/stop.sh $1 8010
-echo ""
-./ServicesSample/Email/bin/stop.sh $1 8008
-echo ""
-./ServicesSample/UsrDatCache/bin/stop.sh $1 8007
-echo ""
-./ServicesSample/EvtGateWay/bin/stop.sh $1 8011
+#go run proxy.go 'http://192.168.4.240:9001/ServiceProxy/center/getProxyConfig?json=1'
 
-echo ""
-./ServicesSample/Ini/bin/start.sh $1 8009
-echo ""
-./ServicesSample/HelloWorld/bin/start.sh $1 8010
-echo ""
-./ServicesSample/Email/bin/start.sh $1 8008
-echo ""
-./ServicesSample/UsrDatCache/bin/start.sh $1 8007
-echo ""
-./ServicesSample/EvtGateWay/bin/start.sh $1 8011
-echo ""
+curl 'http://127.0.0.1:9001/ServiceProxy/center/nodecmd?cmd=start&node=ini01'
+sleep(1)
+curl 'http://127.0.0.1:9001/ServiceProxy/center/nodecmd?cmd=start&node=monitor01' &
+curl 'http://127.0.0.1:9001/ServiceProxy/center/nodecmd?cmd=start&node=monitor01' &
+curl 'http://127.0.0.1:9001/ServiceProxy/center/nodecmd?cmd=start&node=monitor01' &
+

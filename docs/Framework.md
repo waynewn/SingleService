@@ -2,7 +2,7 @@
 
 ## 核心文件说明
 
-### SingleService/AsyncTaskDispather
+### SingleService/AsyncTaskDispatcher
 	
 异步任务的统一入口，包括:
 

@@ -77,6 +77,7 @@ class XML2CenterConfig {
         foreach( $xml->monitor->usergroup->children() as $ugrp){
             $monitorConfig->usersgroup[(string)$ugrp->attributes()->type] = (string)$ugrp->attributes()->data;
         }
+        $monitorConfig->service = (string)$xml->monitor->attributes()->service;
         
         $centerConfig->LogConfig = $logConfig;
         $centerConfig->monitorConfig = $monitorConfig;

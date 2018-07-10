@@ -4,31 +4,25 @@
  *
  * @author wangning
  */
-class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
+class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispatcher{
     /**
      * 创建一个定时任务：每次获取最大指定数量的任务，由异步task执行任务
      * @param \SingleService\Server $SingleServer
      */
-    public function onServerStart($SingleServer,$swooleRequest)
+    public function onServerStart($SingleServer)
     {
-        $modName = $this->_Config->getRuntime('CurServModName');
-        $this->_Config->permanent->sets('locationOfXML',$xmlFile = $this->_Config->getIni("$modName.LocOfServiceProxyXML"));
         try{
-            $ttttt=\Sooh\ServiceProxy\Config\XML2CenterConfig::parse($xmlFile);
-            $ttttt->envIni['MICRO_SERVICE_MODULENAME']=$this->getModuleConfigItem('SERVICE_MODULE_NAME');
-            \Sooh\ServiceProxy\Config\CenterConfig::setInstance($this->_Config, $ttttt);
+            \Sooh\ServiceProxy\Config\CenterConfig::reload($this->_Config);
+            return true;
         }catch(\ErrorException $ex){
-            $msg = "error:".$ex->getMessage()." when parse ServiceProxy config:".$xmlFile;
-            echo $msg;
-            error_log($msg);
-            \Sooh\Curl::getInstance()->httpGet('http://127.0.0.1:'.$swooleRequest->server['server_port'].'/SteadyAsHill/broker/shutdownThisNode');
-            return;
+            $msg = "error : ".$ex->getMessage()." when prepare ServiceProxy config:".$this->_Config->permanent->getConfigLocation();
+            throw new \ErrorException($msg);
         }
-        
     }
     
-    protected function onTimer($server,$tickCounter)
+    protected function onTimer($server)
     {
+        $centerHostName = gethostname();
         $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         $curl = \Sooh\Curl::getInstance();
         $allProxy = array();
@@ -38,14 +32,15 @@ class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
         }
         
         foreach($allProxy as $proxyIp=>$proxyPort){
-            $ret = $curl->httpGet("http://$proxyIp:$proxyPort/".$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/gatherByCenter')->body;
+            $ret = $curl->httpGet("http://$proxyIp:$proxyPort/".$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/gatherByCenter')->body;
             $arr = json_decode($ret,true);
             if(is_array($arr)){
                 foreach($arr['proxy_sum'] as $ipport=>$num){
                     $this->_log->app_trace('proxyCounter '.$proxyIp.' => '.$ipport.' '.$num);
                 }
             }else{
-                $this->_log("TODO error report on proxy down");
+                $evtData = array('foundByCenter'=>$centerHostName,'proxyIpPort'=>$proxyIp.':'.$proxyPort,'time'=>date('m-d H:i:s'));
+                \Sooh\Curl::getInstance()->httpGet($centerConfig->monitorConfig->service,array('evt'=>'ServiceProxyIsDown','data'=>json_encode($evtData)));
                 //$server->createSwooleTask();
                 $this->_log->app_trace('proxyCounterMiss '.$proxyIp.' http-code:'.$curl->httpCodeLast);
             }

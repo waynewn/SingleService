@@ -2,11 +2,13 @@
 
 代码中可以通过
 config->getIni("a.b.c")获取相应配置
-另外，可以通过 Config->getRuntime('CurServModName') 获取当前的实际模块名
+另外，可以通过 Config->getRuntime('SoohCurServModName') 获取当前的实际模块名
 
-比如，当拿出Sameple里的实例时，你可能会改模块名（需要改路径名和bin下相关脚本里），这时，代码里就需要下面的写法：
+提供了快捷方式获取模块专属配置，举例来说，对于HelloWorld模块，下面三种写法等价
 
-        config->getIni( Config->getRuntime('CurServModName') . ".b.c" )
+$this->_Config->getIni("HelloWorld.abc")
+$this->_Config->getIni($this->_Config->getRuntime('SoohCurServModName').".abc")
+$this->_Config->getMainModuleConfigItem('abc')
 
 ==================>改变路由方案，不需要active&deactive操作，重新加载配置就好
 
@@ -19,6 +21,7 @@ config->getIni("a.b.c")获取相应配置
 * 服务名（不是模块名）： SERVICE_MODULE_NAME，逗号分割，根据需要修改，用于避免跟现有的冲突，以及强制版本升级
 * 需要额外加载的其他配置，NeedsMoreIni，英文逗号分割列出所需的其他配置，*是Ini用的，表示加载找到的所有配置
 * Timer_Interval_MS ：多少毫秒触发一次定时任务(AsyncTaskDispatcher->onTimer), =0表示不需要定时任务，<0 表示临时暂停定时任务(恢复时改回>0,重载配置，注意不是立即触发ontimer)
+* Config的permanent存储：PermanentForConfig，默认的IniPermanent（除系统占用了一个，其他只能再存9个长度小于100的字符串），如果有需要，可以通过这里指定自定义的
 
 ## 启动获取和重载
 
@@ -38,7 +41,7 @@ config (Sooh/Ini)
 
 它的runtime在每接收到一个请求的时候会被清空，然后设置：
 
-* CurServModName 当前项目的模块名
+* SoohCurServModName 当前项目的模块名
 
 它的permanent，是简单的数组管理的，没有使用共享内存之类的，所以只能保存不频繁更新，不怕冲突覆盖的：
 

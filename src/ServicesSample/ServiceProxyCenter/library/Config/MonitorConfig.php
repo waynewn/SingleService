@@ -18,4 +18,6 @@ class MonitorConfig {
      * @var array  
      */
     public $usersgroup=array();
+    
+    public $service;
 }

@@ -1,17 +1,7 @@
 <?php
 
 class CenterBase extends \SingleService\ServiceController{
-    /**
-     * @return \Sooh\ServiceProxy\Config\CenterConfig
-     */
-    protected function getCenterConfig()
-    {
-        return \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
-    }
-    protected function updCenterConfig($newone)
-    {
-        \Sooh\ServiceProxy\Config\CenterConfig::setInstance($this->_Config,$newone);
-    }
+
     /**
      * 记录管理命令的日志
      * @param array $args
@@ -26,11 +16,11 @@ class CenterBase extends \SingleService\ServiceController{
     
     protected function getMyIp()
     {
-        return $this->getCenterConfig()->centerIp;
+        return \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config)->centerIp;
     }
     protected function getMyPort()
     {
-        return $this->getCenterConfig()->centerPort;
+        return \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config)->centerPort;
     }
 
     /**
@@ -66,36 +56,24 @@ class CenterBase extends \SingleService\ServiceController{
         if(!is_array($ips)){
             throw new \ErrorException('ips of proxy for getProxiesStatus() should be array, given:'. var_export($ips,true));
         }
-        $centerConfig = $this->getCenterConfig();
-        $uri0 = '/'.$this->getModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/status?skipNodeStatus='.($skipNodeStatus?1:0);
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
+        $uri0 = '/'.$this->_Config->getMainModuleConfigItem('SERVICE_MODULE_NAME').'/proxy/status?skipNodeStatus='.($skipNodeStatus?1:0);
         foreach($ips as $ip){
             if($centerConfig->proxyActive[$ip]){
                 $clients->addTask($ip, $centerConfig->proxyActive[$ip],$uri0);
             }else{
-                
+                $this->_log->app_trace("skip get status from $ip as deactived");
             }
         }
         
-        $ret = $clients->getResultsAndFree();
-        $finalRet=array();
-        foreach ($ret as $k=>$v){
-            $tmp = explode('/', $k);
-            $k = $tmp[2];
-            if($v[0]=='{'){
-                $tmp = json_decode($v);
-                $tmp->CurrentRequesting = json_decode(json_encode($tmp->CurrentRequesting),true);
-                $tmp->NodesStatus = json_decode(json_encode($tmp->NodesStatus),true);
-                $finalRet[$k] = $tmp;
-            }else{
-                $finalRet[$k] = $v;
-            }
-        }
+        $finalRet = $clients->getResultObjAndFree(FALSE,true);
+
         return $finalRet;
-    }    
+    }
     
     public function checkBeforeAction() {
         $remoteAddr = $this->_request->getServerHeader('remote_addr');
-        $centerConfig = $this->getCenterConfig();
+        $centerConfig = \Sooh\ServiceProxy\Config\CenterConfig::getInstance($this->_Config);
         if($remoteAddr!=$centerConfig->centerIp && $remoteAddr!='127.0.0.1' && !isset($centerConfig->proxy[$remoteAddr])){
             $this->_log->app_trace('ignore cmd:'.$this->_request->getActionName().' from '.$remoteAddr);
             $this->setReturnHttpCode(404);

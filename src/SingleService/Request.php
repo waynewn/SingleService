@@ -62,6 +62,7 @@ class Request {
             return $this->_req->cookie;
         }
     }
+    
     public function getServerHeader($key=null)
     {
         if($key==null){

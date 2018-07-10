@@ -1,9 +1,6 @@
 <?php
-//加载自己的autoload
-//    include 'autoload.php';
-
-
-include '../../../SingleService/Server.php';//如果autoload里没有相关路由自动加载，include这个
+define ('SoohServiceProxyUsed','ServiceProxy');//如果工作与 Sooh-ServiceProxy 环境，这里指出对应配置的名称
+require '/root/vendor/autoload.php';//如果autoload里没有相关路由自动加载，include这个
 //usage: 
 //php run.php HelloWorld $1 $2 'http://127.0.0.1:9002/ini/broker/getini?name='
 //      0         1       2  3   4
@@ -14,7 +11,7 @@ if($argc!=5){
 $sys = \SingleService\Server::factory()
         ->initServiceModule(dirname(dirname(__DIR__)),$argv[1]) //本次启动的是哪个微服务
         ->initLog(
-                \SingleService\Loger::getInstance(7)
+                \Sooh\Loger::getInstance()->setTraceLevel(7)
                     //->initFileTpl($basedir, $filenameWithSubDir)  // 可以使用变量：{year},{month},{day},{hour},{minute},{second},{type}
                 ) //可以自定义你自己的日志输出类
         ->initSuccessCode('code', 10000, 'message', 'success')//设置默认的返回值中code,message的名称和成功时默认值

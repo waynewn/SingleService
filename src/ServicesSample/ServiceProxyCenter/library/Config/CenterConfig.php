@@ -12,13 +12,25 @@ class CenterConfig {
      */
     public static function getInstance($config)
     {
-        return $config->permanent->gets('centerConfig');
+        return $config->permanent->getConfigObj();
     }
-    public static function setInstance($config, $centerConfig)
+    public static function setInstance($config,$centerConfig)
     {
-        $config->permanent->sets('centerConfig',$centerConfig);
+        $config->permanent->updConfigObj($centerConfig);
     }
-    
+    /**
+     * 
+     * @return \Sooh\ServiceProxy\Config\CenterConfig
+     */
+    public static function reload($config)
+    {
+        $xmlFile = $config->permanent->getConfigLocation();
+
+        $ttttt=\Sooh\ServiceProxy\Config\XML2CenterConfig::parse($xmlFile);
+        $ttttt->envIni['MICRO_SERVICE_MODULENAME']=$config->getMainModuleConfigItem('SERVICE_MODULE_NAME');
+        $config->permanent->updConfigObj($ttttt);
+        return $ttttt;
+    }
     public $envIni=array();
     /**
      *

@@ -4,7 +4,7 @@
  *
  * @author wangning
  */
-class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
+class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispatcher{
 
     public function sendMail($data)
     {        

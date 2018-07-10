@@ -2,6 +2,26 @@
 namespace SingleService;
 class ServiceController
 {
+    public function getRemoteAddr()
+    {
+        if(defined('SoohServiceProxyUsed')){
+            $givedByProxy = $this->_Config->getini(SoohServiceProxyUsed.'.CookieNameForRemoteIP');
+            $remoteAddr = $this->_request->getCookie($givedByProxy);
+            if(!empty($remoteAddr)){
+                return $remoteAddr;
+            }
+        }
+        
+        $xff = $this->_request->getServerHeader('x-forwarded-for');
+        if(empty($xff)){
+            return $this->_request->getServerHeader('remote_addr');
+        }
+
+        $tmp = explode(',', $xff);
+        return $tmp[0];
+        
+    }
+    
     protected function getRequestTime()
     {
         return $this->_request->getServerHeader('request_time');
@@ -27,6 +47,18 @@ class ServiceController
             $this->_view->assign($this->successCode[2],$this->successCode[3]);
         }
     }
+    /**
+     * 
+     * @param \SingleService\Ret $ret
+     */
+    protected function setReturn($ret)
+    {
+        if($ret->isOk()){
+            $this->setReturnOK($ret->getMessage());
+        }else{
+            $this->setReturnError($ret->getMessage(),$ret->getErrorCode());
+        }
+    }    
     protected function setReturnOK($msg=null)
     {
         $this->_view->setResult(\SingleService\Ret::factoryOk($msg));
@@ -34,9 +66,6 @@ class ServiceController
     protected function setReturnError($msg,$code=null)
     {
         $this->_view->setResult(\SingleService\Ret::factoryError($msg,$code));
-    }
-    protected function getModuleConfigItem($subname){
-        return $this->_Config->getIni($this->_Config->getRuntime('CurServModName').'.'.$subname);
     }
     /**
      *

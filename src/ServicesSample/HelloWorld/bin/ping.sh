@@ -1,2 +1,2 @@
 #!/bin/bash
-curl -s "http://$1:$2/isThisNodeHealth"
+curl -s "http://127.0.0.1:$2/SteadyAsHill/broker/getNumProcessRunning"

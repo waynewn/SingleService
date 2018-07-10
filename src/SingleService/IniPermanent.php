@@ -4,35 +4,51 @@ namespace SingleService;
 class IniPermanent extends \Sooh\IniClasses\Vars{
     protected $_locker;
     protected $_ram;
-    public function __construct() {
+
+    public function __construct($config) {
         $this->_locker = new \swoole_lock(SWOOLE_MUTEX);
-        $this->_ram = new \swoole_buffer();
-        $this->_ram->write(0, serialize(array('__###__sjkadgf__#!'=>1)));
         
+        $this->_ram = new \swoole_table(10);
+        $this->_ram->column('str', \swoole_table::TYPE_STRING, 100);
+        $this->_ram->create();
+
     }
+    
+    public function onNewRequest()
+    {
+    }
+    
     public function gets($k)
     {
-        if(empty($this->_vars)){
-            $this->loadFromRam();
+        if($this->_locker->lockwait(1) == false){
+            throw new \ErrorException("get from shm failed(locked)");
         }
-        return parent::gets($k);
-    }
-    protected function loadFromRam()
-    {
-        $tmp = $this->_ram->read();
-        $this->_vars = unserialize($tmp);
-    }
-    public function sets($k,$v)
-    {
-        if(empty($this->_vars)){
-            $this->loadFromRam();
-        }
-        $ret = parent::sets($k,$v);
-        if($this->_locker->lockwait()==false){
-            return false;
-        }
-        $this->_ram->write(0, serialize($this->_vars));
+
+        $ret = $this->_ram->get($k,'str');
         $this->_locker->unlock();
         return $ret;
+    }
+
+    public function sets($k,$v)
+    {
+        if($this->_locker->lockwait(1) == false){
+            throw new \ErrorException("save to shm failed(locked)");
+        }
+
+        $this->_ram->set($k,array('str'=> $v));
+        $this->_locker->unlock();
+
+    }
+
+    /**
+     * 清空重置
+     * @return Vars
+     */
+    public function free(){
+        return $this;
+    }
+    
+    public function reload(){
+        
     }
 }

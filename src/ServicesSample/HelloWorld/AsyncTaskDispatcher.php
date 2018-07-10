@@ -4,17 +4,17 @@
  *
  * @author wangning
  */
-class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispather{
+class AsyncTaskDispatcher extends \SingleService\AsyncTaskDispatcher{
     /**
      * 
      * @param \SingleService\Server $SingleServer
      */
-    protected function onServerStart($SingleServer,$swooleRequest)
+    protected function onServerStart($SingleServer)
     {
         $this->_log->app_trace('AsyncTaskDispatcher server start:'. json_encode($this->_Config->dump()));
     }
     
-    protected function onTimer($Server, $tickCounter) {
+    protected function onTimer($Server) {
         error_log('------onTick: '.$dt);
         //$SingleServer->createSwooleTask('onTimer00', $dt);
     }

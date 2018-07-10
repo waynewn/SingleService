@@ -1,5 +1,5 @@
 <?php
-namespace Libs;
+namespace Email\Libs;
 /**
 * 邮件发送类
 * SmtpSSL::factory('user=xxx&pass=xxxx&server=smtp.exmail.qq.com[&port=465]')
@@ -9,7 +9,7 @@ class SmtpSimple {
     /**
      * @param string $msgCtrlClassName 类的名字
      * @param string $iniString 类的初始化参数,格式 var1=123&var2=245
-     * @return \MSrvsImpl\Email\SmtpSimple
+     * @return \Email\Libs\SmtpSimple
      */
     public static function factory($iniString)
     {

@@ -11,6 +11,7 @@ class BrokerController extends \SingleService\ServiceController{
     public function getiniAction()
     {
         $s = trim($this->_request->get('name'));
+        $this->_log->app_trace('/ini/getIni: '.$s);
         if($s=='*'){
             $ret = $this->_Config->dump();
             $this->_view->assign('SoohIni',$ret['default']);
@@ -37,5 +38,13 @@ class BrokerController extends \SingleService\ServiceController{
     public function dumpAction()
     {
         $this->_view->assign('all_ini',$this->_Config->dump());
+    }
+    public function envAction()
+    {
+        $trace = $this->_request->getServerHeader();
+        $trace['cookie']=$this->_request->getCookie();
+        $this->_view->assign('trace', $trace);
+        $this->_view->assign('remoteIP', $this->getRemoteAddr());
+        $this->setReturnOK();
     }
 }
